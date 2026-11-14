@@ -329,6 +329,43 @@ static void test_scenes() {
   std::printf("scenes ok\n");
 }
 
+// Band date page: "SAT NOV 14, 2026" appears in the rotation only with a valid clock and a known date.
+static bool band_shows(const char* want, int ms) {
+  bool seen = false;
+  for (int i = 0; i < ms / 250; i++) {
+    gc_tick(250);
+    const char* t = ui_band_text();
+    CHECK(std::strlen(t) <= 18);
+    if (!std::strcmp(t, want)) seen = true;
+  }
+  return seen;
+}
+
+static void test_band_date() {
+  struct { int y, m, d, wd; const char* want; } T[] = {
+    {2026, 11, 14, 6, "SAT NOV 14, 2026"}, {2026, 9, 30, 3, "WED SEP 30, 2026"},
+    {2027, 1, 1, 5, "FRI JAN 1, 2027"}, {2024, 2, 29, 4, "THU FEB 29, 2024"}, {2026, 12, 7, 1, "MON DEC 7, 2026"}};
+  for (auto& c : T) {
+    gc_init(GC_SCENE_VILLAGE, 7, 0);
+    gc_set_clock(8, 0, 1);
+    gc_set_date(c.y, c.m, c.d, c.wd, 1);
+    CHECK(std::strlen(c.want) <= 16);
+    CHECK(band_shows(c.want, 20000));       // one full rotation is at most 16 s
+  }
+  // the longest text is centred inside 240 px at scale 2 (12 px per character)
+  CHECK((GC_W - 16 * 12) / 2 >= 2);
+  // clock not valid: no date page; date unknown (year 0): none either
+  gc_init(GC_SCENE_VILLAGE, 7, 0);
+  gc_set_date(2026, 11, 14, 6, 1);
+  gc_set_clock(8, 0, 0);
+  CHECK(!band_shows("SAT NOV 14, 2026", 30000));
+  gc_set_clock(8, 0, 1);
+  gc_set_date(0, 1, 1, 0, 0);
+  CHECK(!band_shows("SUN JAN 1, 0", 30000));
+  for (int i = 0; i < 120; i++) { gc_tick(250); CHECK(std::strncmp(ui_band_text(), "SUN JAN", 7)); }
+  std::printf("band date ok\n");
+}
+
 // Status band: hero state in plain words, IP address, uptime; only strip 14 is ever redrawn for it.
 static void test_status_band() {
   sim_start(5);
@@ -502,6 +539,7 @@ int main() {
   test_curtain();
   test_banner();
   test_status_band();
+  test_band_date();
   test_budget();
   test_schedule();
   test_scenes();

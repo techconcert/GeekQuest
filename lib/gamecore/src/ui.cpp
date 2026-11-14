@@ -8,7 +8,7 @@ static uint8_t  g_status_idx;
 static uint32_t g_status_acc;
 static uint8_t  s_show_status;          // 1 = the band currently shows a network status line (AP name, password...)
 static uint32_t s_up_s, s_up_ms;        // uptime of the game since init, seconds (the clock restarts the game on every boot)
-static uint8_t  s_pg;                   // status band page: 0 hero state, 1 IP address, 2 uptime
+static uint8_t  s_pg;                   // status band page: 0 hero state, 1 IP address, 2 uptime, 3 date
 static uint32_t s_pg_acc;
 
 // dialogue box (bottom three strips)
@@ -246,6 +246,23 @@ static void uptime_text(char* buf, int cap) {
   }
 }
 
+// 1 when the band's date page can be shown: valid clock and a known date.
+static int date_page_ok(void) { return g_clock_valid && G.year > 0; }
+
+// Date as "SAT NOV 14, 2026" (16 characters at most, 192 px at scale 2).
+static void date_text(char* buf, int cap) {
+  char d[12];
+  int n = str_cat(buf, 0, WDAY_NAME[G.wday % 7], cap);
+  n = str_cat(buf, n, " ", cap);
+  n = str_cat(buf, n, MONTH_NAME[(G.month + 11) % 12], cap);
+  n = str_cat(buf, n, " ", cap);
+  fmt_uint(d, G.mday > 31 ? 31u : G.mday);
+  n = str_cat(buf, n, d, cap);
+  n = str_cat(buf, n, ", ", cap);
+  fmt_uint(d, (uint32_t)G.year);
+  str_cat(buf, n, d, cap);
+}
+
 static void band_update(void) {
   char t[24];
   int icon = I_NONE;
@@ -257,6 +274,8 @@ static void band_update(void) {
     str_copy(t, g_status[0], 24);                 // "IP 192.168.1.20"
   } else if (s_pg == 2) {
     uptime_text(t, 24);
+  } else if (s_pg == 3 && date_page_ok()) {
+    date_text(t, 24);
   } else {
     hero_status_text(t, 24);
   }
@@ -454,8 +473,9 @@ void ui_tick(uint32_t dt) {
   s_pg_acc += dt;
   if (s_pg_acc >= BAND_PAGE_MS) {
     s_pg_acc = 0;
-    s_pg = (uint8_t)((s_pg + 1) % 3);
+    s_pg = (uint8_t)((s_pg + 1) % 4);
     if (s_pg == 1 && g_status[0][0] != 'I') s_pg = 2;   // no address to show
+    if (s_pg == 3 && !date_page_ok()) s_pg = 0;         // no valid date to show
   }
   dialogue_tick(dt);
   curtain_tick(dt);
