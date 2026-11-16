@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
         hero_status_text(st, 24);
         size_t n = std::strlen(st);
         CHECK(n >= 1 && n <= 19);
-        for (size_t i = 0; i < n; i++) CHECK((st[i] >= 'A' && st[i] <= 'Z') || st[i] == ' ' || st[i] == ':' || st[i] == '\'');
+        for (size_t i = 0; i < n; i++) CHECK((st[i] >= 'A' && st[i] <= 'Z') || st[i] == ' ' || st[i] == ':' || st[i] == '\'' || (st[i] >= '0' && st[i] <= '9') || st[i] == '/');   // DEEP CAVES 12/24
         hour_marks++;
       }
       int32_t d = gc_query(GQ_Q_DAY);

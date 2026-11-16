@@ -159,7 +159,11 @@ static void test_cards() {
       CHECK(gc_query(GQ_Q_CARD) == c);
       for (int i = 0; i < 4; i++) gc_tick(250);   // card state refresh
       // the real hero may leave or fight meanwhile, which legitimately closes a card: show it again, then render at once
-      if (gc_query(GQ_Q_CARD) != c) gc_debug(GQ_DBG_SHOW_CARD, c);
+      // (a curtain of the hero's own door visit covers the strips: wait for it to open, then show the card again)
+      for (int w = 0; w < 400 && (ui_curtain_covers(2) || gc_query(GQ_Q_CARD) != c); w++) {
+        if (!ui_curtain_covers(2) && gc_query(GQ_Q_CARD) != c) gc_debug(GQ_DBG_SHOW_CARD, c);
+        else gc_tick(250);
+      }
       CHECK(gc_query(GQ_Q_CARD) == c);
       check_card_strips(c);
       CHECK(ui_card_covers(2) && ui_card_covers(12) && !ui_card_covers(1) && !ui_card_covers(13));

@@ -25,6 +25,7 @@ static int      s_tx, s_ty;
 static GqNeed   s_need;
 static uint8_t  s_turns, s_turn, s_quest_chat;   // chat: number of turns, turn on screen, 1 = quest line first
 static char     s_qline[40];                     // the quest line of this chat
+static uint32_t s_tacc;                          // R11: remainder of the timer slow-down (ms * 4 mod 5)
 static uint32_t s_dv_acc;                        // R8: ms since the last mission minute
 static uint8_t  s_dv_n, s_dv_t;                  // R8: decisions in this room (about 6 s each); where he walks: 0..3 door, 4 way out, 5 chest
 
@@ -695,8 +696,18 @@ static void wake_up(Actor* h) {
   if (talk_solo(TALK_SOLO_WAKE, buf, 40) && buf[0]) say_hero(buf, 2200);   // morning line (the stub has none)
 }
 
+// R11: every dwell, pause and wait that counts down h->timer runs at 4/5 speed, so each lasts 25% longer
+// (the one scaling point; walking, fights and the watchdogs use dt directly). Sleep keeps its own schedule.
+#define HERO_TIMER_NUM 4
+#define HERO_TIMER_DEN 5
+
 static void hero_step(Actor* h, uint32_t dt) {
-  h->timer -= (int32_t)dt;
+  if (h->act == GQ_ACT_SLEEP) h->timer -= (int32_t)dt;
+  else {
+    s_tacc += dt * HERO_TIMER_NUM;
+    h->timer -= (int32_t)(s_tacc / HERO_TIMER_DEN);
+    s_tacc %= HERO_TIMER_DEN;
+  }
   // Bed time (sleep mode 2): whatever he does, once nothing is on screen he walks home and the scheduler picks sleep.
   if (G.sleep_mode == 2 && h->act != ACT_NONE && h->act != GQ_ACT_SLEEP && h->act != ACT_HOME &&
       !ui_busy() && !world_transition_busy()) {
@@ -1263,7 +1274,7 @@ void hero_tick(Actor* h, uint32_t dt) {
 void hero_reset(void) {
   Actor* h = &A[A_HERO];
   clear_talk();
-  s_act_ms = s_phase_ms = 0; s_key = 0xFFFF;
+  s_act_ms = s_phase_ms = 0; s_key = 0xFFFF; s_tacc = 0;
   s_last1 = s_last2 = 0;
   s_bf_day = s_gift_day = s_find_day = 0; s_find_n = 0;
   s_slot = s_npc = 0; s_item_gift = 0xFF; s_force_npc = 0; s_fight_area = 0xFF; s_fight_quest = 0;
