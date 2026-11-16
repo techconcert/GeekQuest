@@ -19,15 +19,25 @@
 #pragma once
 #include "world_priv.h"
 
+// Size switches (the cut list of docs/DESIGN-R11.md 8; both 0 = the full design). Define as 1 before this header
+// (build flag) to drop the feature: NAMES = every boss is called BOSS (band "BOSS HP 5"), saves about 250 bytes;
+// KNOCKBACK = a hit stuns in place instead of sliding back 2 tiles, saves about 90 bytes.
+#ifndef BOSS_CUT_NAMES
+#define BOSS_CUT_NAMES 0
+#endif
+#ifndef BOSS_CUT_KNOCKBACK
+#define BOSS_CUT_KNOCKBACK 0
+#endif
+
 #define BOSS_COUNT 15
 #define BOSS_SHOTS 10
 
 enum { BA_SHOT, BA_BOLT, BA_SPREAD, BA_FAN, BA_RING, BA_SPIRAL, BA_CROSS, BA_XSHOT, BA_SLAM, BA_MINE, BA_CHARGE, BA_HOP };
-enum { BS_WALK, BS_TELE, BS_CHARGE, BS_REST, BS_TIRED, BS_DEAD };   // boss_phase()
+enum { BS_WALK, BS_TELE, BS_CHARGE, BS_TIRED };   // a rest after the third attack is BS_WALK with nothing to do   // boss_phase()
 
 struct BossShot {          // 8 bytes; a slot with life 0 is free
   int16_t x, y;            // centre, 1/16 pixel (0..3839)
-  int8_t  vx, vy;          // 1/16 pixel per 32 ms step
+  int16_t vx, vy;          // 1/16 pixel per 32 ms step
   uint8_t life;            // steps left
   uint8_t icon;            // items.png cell
 };
@@ -62,5 +72,4 @@ int  boss_phase(void);                        // BS_*
 int  boss_telegraph(void);                    // 0, or BA_* + 1 of the attack being telegraphed / the charge running
 int  boss_hp(void);
 uint32_t boss_clock(void);                    // ms of the fight
-int  boss_aim_ready(void);                    // 1 = hero may strike: not telegraphing, not charging
 // live shots: the pool g_bshot (centre x/16, y/16, vx, vy per 32 ms step, life 0 = free)

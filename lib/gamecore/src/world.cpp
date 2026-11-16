@@ -2,6 +2,7 @@
 // area changes through the curtain, dynamic objects, sprite list and dirty tracking.
 // (design 11.5; hero.cpp holds the scheduler and the activities, npc.cpp the others.)
 #include "world_priv.h"
+#include "boss.h"
 #include "map_data.h"
 #include "delve.h"
 
@@ -355,7 +356,8 @@ static int delve_build_room(void) {
   }
   uint32_t hs = scat_rnd();                            // middle feature: one block inside x 4..10, y 5..9 (or none)
   int bw = 1 + (int)(hs >> 4) % 3, bh = 1 + (int)(hs >> 6) % 3;
-  if (hs & 3) fill((fl & DF_FEATOBJ) ? MO_OBJ : MO_GROUND, XY(4 + (int)(hs >> 8) % (8 - bw), 5 + (int)(hs >> 12) % (6 - bh)), WH(bw, bh), feat);
+  // R11: an exit room is the boss arena: no middle block and no first scatter row
+  if ((hs & 3) && !(kind & DK_EXIT)) fill((fl & DF_FEATOBJ) ? MO_OBJ : MO_GROUND, XY(4 + (int)(hs >> 8) % (8 - bw), 5 + (int)(hs >> 12) % (6 - bh)), WH(bw, bh), feat);
   if (kind & DK_CHEST) {                              // a chest in a corner of the ring (doors are mid-edge): always reachable
     int x = (hs & 4) ? 12 : 2, y = (hs & 8) ? 10 : 3;
     g_obj[y][x] = fresh ? WT_CHEST : WT_CHEST_OPEN;
@@ -365,7 +367,7 @@ static int delve_build_room(void) {
   for (int k = 0; k < 5; k++) {
     const uint8_t* e = DV_SCAT[b][k];
     uint8_t f = GC_RD8(&e[2]);
-    if (!((f >> season) & 1) || ((f & 16) && !fresh) || ((f & 32) && (sseed & 1))) continue;
+    if ((k == 0 && (kind & DK_EXIT)) || !((f >> season) & 1) || ((f & 16) && !fresh) || ((f & 32) && (sseed & 1))) continue;
     scatter(1, 1, 13, 13, GC_RD8(&e[0]), GC_RD8(&e[1]), k, sseed >> 1);
   }
   return r;
@@ -663,9 +665,10 @@ static int actor_ops(int i, Op* ops) {
       } else if (a->kind == AK_CAT) {
         cell = a->pose == POSE_BED ? WC_CAT + 3 : (a->dir == DIR_DOWN || a->dir == DIR_UP ? WC_CAT : WC_CAT + 1 + (a->step & 1));
       } else {   // monster
-        if (a->id == GQ_MON_BOSS) cell = a->pose == POSE_HURT ? WC_BOSS + 2 : WC_BOSS + (a->anim & 1);
+        if (a->phase) cell = WC_DBOSS + a->phase - 1;   // R11 deep boss: one frame
+        else if (a->id == GQ_MON_BOSS) cell = a->pose == POSE_HURT ? WC_BOSS + 2 : WC_BOSS + (a->anim & 1);
         else cell = WC_MON + (a->id < 4 ? a->id : 0) * 2 + (a->anim & 1);
-        fl = (a->anim >> 1) & 1;   // monsters face either way, for life
+        fl = a->phase ? A[A_HERO].x > a->x : (a->anim >> 1) & 1;   // monsters face either way, for life; a deep boss faces the hero
       }
       Op body = {a->x, a->y, SH_CHARS, (uint8_t)cell, (uint8_t)fl, (uint8_t)i, 0, a->kind == AK_MONSTER ? a->bob : (uint8_t)0};
       ops[n++] = body;   // a monster's palette row (R8 recolours) is kept in bob
@@ -711,6 +714,10 @@ static void rebuild_ops(void) {
       A[i].box_y = (int16_t)(n ? miny : 0);
       A[i].box_h = (int16_t)(n ? maxy - miny : 0);
     }
+  }
+  for (int i = 0; i < BOSS_SHOTS; i++) {      // R11: the boss's shots
+    const BossShot& sh = g_bshot[i];
+    if (sh.life && s_nops < 48) { Op o = {(int16_t)((sh.x >> 4) - 8), (int16_t)((sh.y >> 4) - 8), SH_ITEMS, sh.icon, 0, 0, 1, 0}; s_ops[s_nops++] = o; }
   }
   for (int i = 1; i < s_nops; i++) {          // stable insertion sort by (top, y)
     Op k = s_ops[i];
@@ -774,6 +781,7 @@ void world_init(void) {
   s_water_frame = s_fire_frame = s_bell_frame = 0;
   s_water_acc = s_fire_acc = s_bell_acc = s_dyn_acc = s_idle_acc = 0;
   for (int i = 0; i < A_COUNT; i++) { actor_clear(&A[i]); }
+  boss_clear();
   Actor* h = &A[A_HERO];
   h->kind = AK_HERO;
   h->visible = 1;
@@ -821,6 +829,7 @@ void world_tick(uint32_t dt) {
   A[A_HERO].ms_per_px = econ_tool(GQ_TOOL_BOOTS) >= 1 ? 18 : 24;
   hero_tick(&A[A_HERO], dt);
   for (int i = 1; i < A_COUNT; i++) if (A[i].kind != AK_NONE) npc_tick(i, dt);
+  boss_tick(dt);
   for (int i = 0; i < A_COUNT; i++) if (A[i].kind != AK_NONE) move_actor(&A[i], dt);
   rebuild_ops();
   hero_update_presence();

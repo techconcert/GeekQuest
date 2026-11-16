@@ -141,7 +141,7 @@ static void test_determinism() {
   // golden hashes: a saved mission's level must not change silently
   uint32_t g1 = build_hash(1, 1, 0), g2 = build_hash(4242, 2, 7, 0, 7), g3 = build_hash(99999, 3, delve_gen(99999)->exit, 0, 15);
   std::printf("golden %08x %08x %08x\n", g1, g2, g3);
-  static const uint32_t GOLD[3] = {0xbbc29668u, 0xd6af57d0u, 0x20ec6071u};
+  static const uint32_t GOLD[3] = {0xbbc29668u, 0xd6af57d0u, 0x08216cfdu};   // R11: the third golden room is an exit room (boss arena: no middle block, no first scatter row), re-recorded
   CHECK(g1 == GOLD[0] && g2 == GOLD[1] && g3 == GOLD[2]);
 }
 

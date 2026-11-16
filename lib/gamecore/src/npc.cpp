@@ -1,6 +1,7 @@
 // Villagers with schedules, the cat, critters and monsters. (Split out of village.cpp; chunk 3.)
 #include "world_priv.h"
 #include "delve.h"
+#include "boss.h"
 
 #define NXY(x, y) ((uint8_t)(((x) << 4) | (y)))
 
@@ -63,7 +64,7 @@ int npc_monster_slot(int skip) {
   for (int k = 0; k < A_COUNT - 1; k++) {
     int i = 1 + (start - 1 + k) % (A_COUNT - 1);
     if (i == skip) continue;
-    if (A[i].kind == AK_MONSTER && A[i].visible && !A[i].talking && A[i].act == 0) return i;
+    if (A[i].kind == AK_MONSTER && A[i].visible && !A[i].talking && A[i].act == 0 && !A[i].phase) return i;   // not a deep boss
   }
   return -1;
 }
@@ -112,14 +113,22 @@ static void delve_populate(void) {
   const DelveGraph* dg = delve_gen(seed);
   int r = G.s.dv_cur < dg->n ? G.s.dv_cur : 0, b = G.s.dv_state - 1, k = delve_kind(r);
   if (b < 0 || b > 2) b = 0;
+  boss_clear();
   if (r == 0 || ((G.s.dv_seen >> r) & 1)) return;          // the entry room and rooms already left are quiet
   uint32_t h = dvh(seed, (uint32_t)r, 0x30B);
-  int n = (k & DK_EXIT) ? 3 : 2 + (int)((h >> 8) % 2), cx = 7, cy = 7;
-  if (k & DK_EXIT) world_spot(SP_DOOR, &cx, &cy);
+  int n = 2 + (int)((h >> 8) % 2), cx = 7, cy = 7;
+  if (k & DK_EXIT) {                                       // R11: the exit room holds its boss and nothing else,
+    int bn = boss_for(b + 1, seed), x, y;                  // 2 tiles inward from the way out
+    world_spot(SP_DOOR, &cx, &cy);
+    x = cx + 2 * ((7 > cx) - (7 < cx)); y = cy + 2 * ((7 > cy) - (7 < cy));
+    if (!walkable(x, y) && !free_tile(x, y, 4, &x, &y)) return;
+    Actor* a = spawn(AK_MONSTER, GQ_MON_BOSS, x, y, 100);
+    if (a) boss_init_actor(a, bn);
+    return;
+  }
   for (int i = 0; i < n; i++) {
     int e = GC_RD8(&DV_MON[b][(h >> (i * 3)) % 3]), id = e & 15, x, y;
-    if (b == 2 && (k & DK_EXIT)) { id = i ? GQ_MON_GHOST : GQ_MON_BOSS; e = id; }   // boss and two ghosts
-    if (!free_tile(cx, cy, (k & DK_EXIT) ? 4 : 6, &x, &y)) break;
+    if (!free_tile(cx, cy, 6, &x, &y)) break;
     Actor* a = spawn(AK_MONSTER, id, x, y, mon_ms(id));
     if (a) a->bob = (uint8_t)(e >> 4);
   }
@@ -217,6 +226,7 @@ static void wander(Actor* n, int radius, int dmin, int dmax) {
 
 void npc_tick(int i, uint32_t dt) {
   Actor* n = &A[i];
+  if (n->kind == AK_MONSTER && n->phase) return;          // a deep boss is driven by boss_tick()
   n->timer -= (int32_t)dt;
   if (n->kind != AK_VILLAGER) {
     n->anim_acc = (uint16_t)(n->anim_acc + dt);
