@@ -5,7 +5,7 @@
 Reads assets/src/{tiles,chars,items}.png, paints every cell listed in EXPECTED
 (cell ids are the ones of DESIGN.md 10.5) and writes the sheets back. Cells that
 are not listed (tiles 0..29, hero cells 0..5 and 8..10, items 0..10, I_STAR,
-I_FACE and the spare chars cell 63) are never touched, so the script is
+I_FACE and the spare chars cells 78 and 79) are never touched, so the script is
 idempotent: running it twice gives the same PNGs.
 
 Every pixel is a colour of tools/palette.py; '.' is transparent (magenta in the
@@ -1368,6 +1368,293 @@ C[60] = boss(0, False)
 C[61] = boss(1, False)
 C[62] = boss(0, True)
 
+# 63..77 the bosses of the deep missions (R11), one frame each: forest 63..67, cave 68..72, ruins 73..77
+# 63 THORNBACK
+C[63] = S([
+    "................",
+    "....l..l..l.....",
+    "...kGkkGkkGkk...",
+    "..kGgkGgkGgkGk..",
+    ".kkbBBBBBBBBbkk.",
+    "kBBBBBBBBBBBBbbk",
+    "kBkoBBBBBBBBBbbk",
+    "kBkkBBBBBBBBBbbk",
+    "ksBBBBBBBBBBBbbk",
+    "koksBBBBBBBBbbk.",
+    ".kokkBBBBBbbbk..",
+    "..kkbBkkkkbBk...",
+    "...kbbk..kbbk...",
+    "...kkkk..kkkk...",
+    "................",
+    "................",
+])
+# 64 OLD STUMP
+C[64] = S([
+    "....kk....kk....",
+    "...kGGk..kGGk...",
+    "..kGlGGkkGGlGk..",
+    "..kGGGGGGGGGGk..",
+    "...kkGGGGGGkk...",
+    "..kkBBkkkkBBkk..",
+    ".kBBBBBBBBBBBBk.",
+    ".kBkkBBBBBBkkBk.",
+    ".kBkYBBBBBBYkBk.",
+    ".kBBBBBBBBBBBBk.",
+    ".kbBBkkkkkkBBbk.",
+    ".kbBBBkookBBBbk.",
+    ".kbbBBBBBBBBbbk.",
+    "kkbkbbBBBBbbkbkk",
+    "kbkkkbbkkbbkkkbk",
+    "kkk.kkk..kkk.kkk",
+])
+# 65 QUEEN BEE
+C[65] = S([
+    "......r..r......",
+    "..kk..kYYk..kk..",
+    ".kffk.kYYk.kffk.",
+    "kffffkkYYkkffffk",
+    "kfffkYYYYYYkfffk",
+    ".kfkYkYYYYkYkfk.",
+    "..kkYkYYYYkYkk..",
+    "..kYYYYYYYYYYk..",
+    "..kkkkkkkkkkkk..",
+    "..kYYYYYYYYYYk..",
+    "..kkkkkkkkkkkk..",
+    "...kYYYYYYYYk...",
+    "....kkkkkkkk....",
+    ".....kYYYYk.....",
+    "......kkkk......",
+    ".......kk.......",
+])
+# 66 MOSSMAW
+C[66] = S([
+    "................",
+    "................",
+    "..kkkk....kkkk..",
+    ".kooookkkkooook.",
+    ".kokkoGGGGokkok.",
+    ".kooooGGGGooook.",
+    "kGkkkkGGGGkkkkGk",
+    "kGGGGGGGGGGGGGGk",
+    "kGkGGGGGGGGGGkGk",
+    "kGGkkkkkkkkkkGGk",
+    "kGlrrrrrrrrrrlGk",
+    "kGGkkkkkkkkkkGGk",
+    ".kGGllllllllGGk.",
+    "kkGgkGGGGGGkgGkk",
+    "kGGgkkkkkkkkgGGk",
+    "kkkkk......kkkkk",
+])
+# 67 CAPTAIN CAP
+C[67] = S([
+    ".....kkkkkk.....",
+    "...kkrrrrrrkk...",
+    "..krrorrrrorrk..",
+    ".krroooorrrrrrk.",
+    ".krrorrrrroorrk.",
+    "krrrrrrorroooork",
+    "krrorrrrrrrorrrk",
+    "kkkkkkkkkkkkkkkk",
+    "...kssssssssk...",
+    "...kskksskksk...",
+    "...kssssssssk...",
+    "...ksskkkkssk...",
+    "...kssssssssk...",
+    "...kssssssssk...",
+    "..kkssbkkbsskk..",
+    "..kkkkk..kkkkk..",
+])
+# 68 ROCKJAW
+C[68] = S([
+    "....kkkkkkkk....",
+    "...kBsBBBBBBk...",
+    "..kBsBBBBBBBBk..",
+    "..kBkkBBBBkkBk..",
+    "..kBkYBBBBYkBk..",
+    ".kkBBBBBBBBBBkk.",
+    "kBBkkokokokkkBBk",
+    "kBbkBBBBBBBBkBbk",
+    "kBbkkkkkkkkkkBbk",
+    "kBbk.kBBBbk.kBbk",
+    "kkk..kBBBbk..kkk",
+    ".....kBYBbk.....",
+    "....kkbkkbkk....",
+    "...kBBbk.kBBbk..",
+    "...kBbbk.kBbbk..",
+    "...kkkkk.kkkkk..",
+])
+# 69 GLOOMWING
+C[69] = S([
+    "................",
+    "k..............k",
+    "kk....k..k....kk",
+    "kwk..kwkkwk..kwk",
+    "kwwkkwwwwwwkkwwk",
+    "kwWwkwYwwYwkwWwk",
+    "kwWwwwwwwwwwwWwk",
+    "kwWwwkokkokwwWwk",
+    "kwkwwwkkkkwwwkwk",
+    "kk.kwwwwwwwwk.kk",
+    "k...kwwwwwwk...k",
+    "....kkwwwwkk....",
+    ".....kwkkwk.....",
+    ".....kk..kk.....",
+    "................",
+    "................",
+])
+# 70 SHARDSHELL
+C[70] = S([
+    "......kk........",
+    ".....kfWk..kk...",
+    "..kk.kWWk.kfWk..",
+    ".kfWkkWWkkkWWk..",
+    ".kWWkWfWWkWWwk..",
+    "..kkBBBBBBBBkk..",
+    "kk.kBBBBBBBBk.kk",
+    "kBkkBokBBokBkkBk",
+    "kBBkBkkBBkkBkBBk",
+    "kkBkBBBBBBBBkBkk",
+    ".kkkbBBBBBBbkkk.",
+    "..kkkbbbbbbkkk..",
+    ".kk.kkkkkkkk.kk.",
+    ".k..k..kk..k..k.",
+    "................",
+    "................",
+])
+# 71 BORER
+C[71] = S([
+    ".....kkkkkk.....",
+    "....kppppppk....",
+    "...kpkppppkpk...",
+    "...kppppppppk...",
+    "...kkokokokkk...",
+    "...kprrrrrrpk...",
+    "...kkokokokkk...",
+    "....kppppppk....",
+    "....kkkkkkkk....",
+    "....kppppppk....",
+    "....kkkkkkkk....",
+    "....kppppppk....",
+    "..kkkkkkkkkkkk..",
+    ".kbbakbbbbkabbk.",
+    ".kkbbbbaabbbbkk.",
+    "...kkkkkkkkkk...",
+])
+# 72 CINDER
+C[72] = S([
+    "......Y.........",
+    ".....YrY...Y....",
+    "..Y..YrrY.YrY...",
+    ".YrY.kkkkkkrY...",
+    ".YrkkrrrrrrkkY..",
+    "..krrYrrrrrrrk..",
+    ".krrYrrrrrrrrrk.",
+    ".krrrkkrrkkrrrk.",
+    ".krrrkYrrkYrrrk.",
+    ".krrrrrrrrrrrrk.",
+    ".krYrrkkkkrrrrk.",
+    ".krrrrrYYrrrYrk.",
+    ".kkrrrrrrrrrrkk.",
+    "..kkkrrrrrrkkk..",
+    "....kkkkkkkk....",
+    "................",
+])
+# 73 THE WARDEN
+C[73] = S([
+    ".......rr.......",
+    "......krrk......",
+    ".....kkkkkk.....",
+    "....kaaoaaak....",
+    "....kakkkkak....",
+    "....kaYkkYak....",
+    "....kaakkaak....",
+    "..kkkkaaaakkkk..",
+    ".kaakaaaaaakWWk.",
+    ".kaakaaoaaakWYk.",
+    ".kkakaaaaaakWWk.",
+    "..kkkaaaaaakkk..",
+    "....kakkkkak....",
+    "...kaak..kaak...",
+    "...kaak..kaak...",
+    "...kkkk..kkkk...",
+])
+# 74 RATTLE KING
+C[74] = S([
+    "..k...k..k...k..",
+    "..kYk.kYYk.kYk..",
+    "..kYYkYYYYkYYk..",
+    "..kkkkkkkkkkkk..",
+    ".kooooooooooook.",
+    ".kokkkooookkkok.",
+    ".kokrkooookrkok.",
+    ".kokkkooookkkok.",
+    ".koooookkoooook.",
+    "..kooookkooook..",
+    "..kkokokokokkk..",
+    "...kkkkkkkkkk...",
+    "...kokokokokk...",
+    "....kkkkkkkk....",
+    "................",
+    "................",
+])
+# 75 THE EYE
+C[75] = S([
+    ".....kkkkkk.....",
+    "...kkooooookk...",
+    "..koooWWWWoook..",
+    ".koroWWkkWWorok.",
+    ".kooWWkkkkWWook.",
+    ".kooWWkkkkWWook.",
+    ".koroWWkkWWorok.",
+    "..koooWWWWoook..",
+    "...kkooooookk...",
+    "....kkkkkkkk....",
+    "..krk.krrk.krk..",
+    "..krk..kk..krk..",
+    ".krk........krk.",
+    ".kk..........kk.",
+    "................",
+    "................",
+])
+# 76 HEX
+C[76] = S([
+    ".....kkkk....kk.",
+    "....kwwwwk..kYYk",
+    "...kwwwwwwk..kk.",
+    "...kwkkkkwk..kb.",
+    "..kwkYkkYkwk.kb.",
+    "..kwkkkkkkwk.kb.",
+    "..kwwwkkwwwkkpk.",
+    ".kwwwwwwwwwwkkb.",
+    ".kwwWwwwwwwwkkb.",
+    ".kwwWwwwwwwwkkb.",
+    ".kwwwwwwwwwwkkb.",
+    "kwwwwwwwwwwwwkb.",
+    "kwwYwwwwwwYwwkb.",
+    "kwwwwwwwwwwwwkb.",
+    "kkwwkkwwkkwwkkk.",
+    ".kk..kk..kk.....",
+])
+# 77 STONE IDOL
+C[77] = S([
+    "..kkkkkkkkkkkk..",
+    ".kaoaaaaaaaaaak.",
+    ".kakkkaaaakkkak.",
+    ".kakrkaaaakrkak.",
+    ".kakkkaaaakkkak.",
+    ".kaaaaakkaaaaak.",
+    ".kaaaakaakaaaak.",
+    ".kakkkkkkkkkkak.",
+    ".kakokokokokkak.",
+    ".kakkkkkkkkkkak.",
+    ".kaaaaaaaaaaaak.",
+    "..kkkkkkkkkkkk..",
+    ".kkaaGaaaaaaakk.",
+    ".kaaaaaaaaGaaak.",
+    ".kkkkkkkkkkkkkk.",
+    "................",
+])
+
 # ================================================================== ITEMS
 # 11 / 12 I_SWORD_UP / I_SWORD_DOWN
 SWORD = [
@@ -1789,7 +2076,7 @@ SHEETS = [("tiles.png", T, 16), ("chars.png", C, 8), ("items.png", I, 8)]
 # ids of the placeholder cells that this script paints
 EXPECTED = {
     "tiles.png": list(range(30, 96)),
-    "chars.png": [6, 7] + list(range(11, 63)),
+    "chars.png": [6, 7] + list(range(11, 78)),
     "items.png": list(range(11, 32)) + [33] + list(range(35, 48)),
 }
 
@@ -1809,6 +2096,12 @@ def main():
     for fname, cells, cols in SHEETS:
         path = os.path.join(SRC, fname)
         img = Image.open(path).convert("RGB")
+        need = (max(EXPECTED[fname]) // cols + 1) * 16
+        if img.size[1] < need:
+            # grow the sheet: magenta (transparent) below, old art on top
+            big = Image.new("RGB", (img.size[0], need), (255, 0, 255))
+            big.paste(img, (0, 0))
+            img = big
         for i in EXPECTED[fname]:
             c = cells.get(i)
             if c is None:

@@ -32,7 +32,8 @@ enum {
   WC_MON = 40,             // slime, bat, crab, ghost: A/B each
   WC_CRIT = 48,            // chicken, frog, butterfly: A/B; firefly 54; bird 55
   WC_CAT = 56,             // down, side A, side B, asleep
-  WC_BOSS = 60             // A, B, hurt
+  WC_BOSS = 60,            // A, B, hurt
+  WC_DBOSS = 63            // R11: boss b of the deep missions is cell 63 + b (63..77)
 };
 
 // ---- spots: named tiles of an area (16 at most), looked up with world_spot()
