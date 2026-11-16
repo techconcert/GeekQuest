@@ -4,15 +4,16 @@ A self-playing pixel-art village game for the GeekMagic 240x240 ESP8266 clock. A
 adventurer takes breaks from questing to wander the village, chop wood, fish, trade and
 chat. You never press anything: it is a clock with a little world in it. The top bar shows the
 time, the real weather outside (icon and temperature for the place you choose) and the season. The
-bottom band shows what the hero is doing right now, the clock's IP address and the uptime. At night
+bottom band shows what the hero is doing right now, the clock's IP address, the uptime and the
+weekday and date (for example SAT NOV 14, 2026). At night
 (or in the hours you choose) the hero goes to bed and the screen goes dark until the wake time.
 
 **Download:** every build of the `main` branch is published on the
 [Releases page](https://github.com/techconcert/GeekQuest/releases). Releases are named by number
-(GeekQuest r8, **GeekQuest r10**, ...; the number lives in the `VERSION` file) and the newest is marked
+(GeekQuest r10, **GeekQuest r11**, ...; the number lives in the `VERSION` file) and the newest is marked
 "Latest". Each release has the two firmware files, `preview.html` (the game in your browser)
 and `SHA256SUMS.txt`. The file names also carry the short commit, for example
-`SDP_GeekQuest_quest_r10-1a2b3c4.bin`.
+`SDP_GeekQuest_quest_r11-1a2b3c4.bin`.
 
 ## What the game looks like
 
@@ -36,6 +37,20 @@ progress survives a power cut. The cave needs the pick and the ruins the lantern
 | Forest | Caves | Ruins |
 |---|---|---|
 | ![Deep forest](docs/screenshots/deep_forest.png) | ![Deep caves](docs/screenshots/deep_caves.png) | ![Deep ruins](docs/screenshots/deep_ruins.png) |
+
+## Bosses (R11)
+
+Every deep mission ends in a boss room. There are 15 bosses, five per biome, each with its own
+sprite and its own cycle of three attacks (single shots, spreads, fans, rings, spirals, slams, mines,
+charges and teleport hops). Which boss waits at the end comes from the level seed. The hero has no
+hearts to lose in these fights: he reads where the shots will be, circles, steps in to strike when it
+is safe, and a hit only knocks him back and stuns him for a moment. The band shows the boss name and
+health, for example `CINDER HP 7`. A fight always ends by itself (the boss tires after 70 seconds), and
+the mission time limit still applies. Design: [docs/DESIGN-R11.md](docs/DESIGN-R11.md).
+
+| Forest: Thornback | Caves: Cinder | Ruins: Rattle King |
+|---|---|---|
+| ![Forest boss](docs/screenshots/boss_forest.png) | ![Cave boss](docs/screenshots/boss_caves.png) | ![Ruins boss](docs/screenshots/boss_ruins.png) |
 
 ## Hardware
 
