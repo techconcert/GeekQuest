@@ -155,25 +155,25 @@ attack rest 2 s. From `F.ms >= 70000` the state is "tired" for good: no moves, n
 
 ## 3. The 15 bosses
 
-Health is in hero hits (1 per hit, 2 with sword level 2 or more). Cells are in chars.png after the sheet grows:
+Health is in hero hits (1 per hit, 2 with sword level 2 or more). Chunk C lowered the five bosses that vanish or turn the hero around (rows 1, 2, 3, 8, 13) to the values below so that test_beatable reaches 95 % of fights before 70 s. Cells are in chars.png after the sheet grows:
 `WC_DBOSS = 63`, boss b uses cell `63 + b`.
 
 | b | cell | name | biome | hp | ms/px | walks | pause | attack cycle | shot icon |
 |---|------|------|-------|----|-------|-------|-------|--------------|-----------|
 | 0 | 63 | THORNBACK | forest | 8 | 40 | 2 tiles | 1.6 s | CHARGE, SPREAD, CHARGE | herb |
-| 1 | 64 | OLD STUMP | forest | 10 | - | rooted | 1.4 s | SLAM, SHOT, FAN | wood |
-| 2 | 65 | QUEEN BEE | forest | 6 | 30 | 3 tiles | 1.0 s | BOLT, HOP, BOLT | bobber |
-| 3 | 66 | MOSSMAW | forest | 9 | - | hops only | 1.5 s | HOP, RING, MINE | gel |
+| 1 | 64 | OLD STUMP | forest | 8 | - | rooted | 1.4 s | SLAM, SHOT, FAN | wood |
+| 2 | 65 | QUEEN BEE | forest | 5 | 30 | 3 tiles | 1.0 s | BOLT, HOP, BOLT | bobber |
+| 3 | 66 | MOSSMAW | forest | 5 | - | hops only | 1.5 s | HOP, RING, MINE | gel |
 | 4 | 67 | CAPTAIN CAP | forest | 8 | 90 | 1 tile | 1.2 s | SPIRAL, SPIRAL, MINE | mushroom |
 | 5 | 68 | ROCKJAW | cave | 10 | 80 | 2 tiles | 1.6 s | SLAM, CROSS, SLAM | stone |
 | 6 | 69 | GLOOMWING | cave | 6 | 30 | 3 tiles | 1.0 s | CHARGE, CHARGE, FAN | poof |
 | 7 | 70 | SHARDSHELL | cave | 8 | 60 | 2 tiles | 1.4 s | CROSS, XSHOT, SPREAD | gem |
-| 8 | 71 | BORER | cave | 7 | - | hops only | 1.3 s | HOP, RING, SHOT | ore |
+| 8 | 71 | BORER | cave | 4 | - | hops only | 1.3 s | HOP, RING, SHOT | ore |
 | 9 | 72 | CINDER | cave | 8 | 55 | 3 tiles | 1.2 s | MINE, SPREAD, MINE | berry |
 | 10 | 73 | THE WARDEN | ruins | 10 | 45 | 2 tiles | 1.5 s | CHARGE, BOLT, CROSS | sword |
 | 11 | 74 | RATTLE KING | ruins | 8 | 70 | 2 tiles | 1.4 s | FAN, RING, SHOT (HOMING if kept) | shell |
 | 12 | 75 | THE EYE | ruins | 7 | - | hovers in place | 1.0 s | BOLT, BOLT, SPIRAL | bobber |
-| 13 | 76 | HEX | ruins | 6 | - | hops only | 1.2 s | HOP, SPREAD, XSHOT | star |
+| 13 | 76 | HEX | ruins | 4 | - | hops only | 1.2 s | HOP, SPREAD, XSHOT | star |
 | 14 | 77 | STONE IDOL | ruins | 12 | - | rooted | 1.3 s | CROSS, XSHOT, SLAM | stone |
 
 How they differ for someone watching: Thornback and Gloomwing rush him (he sidesteps out of the lane); Old Stump

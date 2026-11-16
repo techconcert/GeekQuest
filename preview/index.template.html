@@ -204,7 +204,15 @@ textarea { width: 100%; box-sizing: border-box; height: 5.2em; font-family: var(
             <input id="dv-seed" type="number" min="0" max="1073741823" value="0" aria-label="Level seed (0 = a new one each time)">
             <button class="small" id="dv-go" type="button">Start mission</button>
           </div>
-          <p class="note">The hero walks to the entrance and explores the generated level (20 to 30 rooms, about 40 minutes). The band at the bottom reads DEEP CAVES 12/24. Level seed 0 picks a new level. Use a fast speed, and keep the clock in daytime: he turns back at bed time.</p>
+          <div class="seg">
+            <select id="dv-boss" aria-label="Boss">
+              <optgroup label="Deep forest"><option value="0">Thornback</option><option value="1">Old Stump</option><option value="2">Queen Bee</option><option value="3">Mossmaw</option><option value="4">Captain Cap</option></optgroup>
+              <optgroup label="Deep caves"><option value="5">Rockjaw</option><option value="6">Gloomwing</option><option value="7">Shardshell</option><option value="8">Borer</option><option value="9">Cinder</option></optgroup>
+              <optgroup label="Deep ruins"><option value="10">The Warden</option><option value="11">Rattle King</option><option value="12">The Eye</option><option value="13">Hex</option><option value="14">Stone Idol</option></optgroup>
+            </select>
+            <button class="small" id="dv-boss-go" type="button">Fight this boss</button>
+          </div>
+          <p class="note">The hero walks to the entrance and explores the generated level (20 to 30 rooms, about 40 minutes). The band at the bottom reads DEEP CAVES 12/24. Level seed 0 picks a new level. "Fight this boss" skips the level: he is in the boss room at once (a level whose boss is that one). Use a fast speed, and keep the clock in daytime: he turns back at bed time.</p>
         </div>
         <div class="group">
           <h2>Info cards</h2>
@@ -418,7 +426,7 @@ textarea { width: 100%; box-sizing: border-box; height: 5.2em; font-family: var(
    "FESTIVAL", "EVENT", "HERO_PRESENCE", "HERO_AREA", "HERO_ACT", "HERO_HEARTS", "HERO_TILE", "GOAL", "GOAL_PRICE",
    "PROJECTS", "CHAPTER", "QUEST", "QUEST_STEP", "QUEST_COUNT", "TILL_LEFT", "ERRANDS_TODAY", "ACH_COUNT",
    "SEEN_COUNT", "CARD", "ACTORS_VISIBLE", "HERO_ABED", "LIVE_WX", "LIVE_TEMP", "LIVE_FLAGS", "SLEEP_MODE"].forEach((k, i) => { Q[k] = i; });
-  const DBG = { ADD_COINS: 0, SET_DAY: 1, SET_WEATHER: 2, ADD_ITEM: 3, START_QUEST: 4, SHOW_CARD: 5, FORCE_ACT: 6, BUY_GOAL: 7, NEXT_DAY: 8, FORCE_CHAT: 9, TALK_TURNS: 10, DELVE: 11 };
+  const DBG = { ADD_COINS: 0, SET_DAY: 1, SET_WEATHER: 2, ADD_ITEM: 3, START_QUEST: 4, SHOW_CARD: 5, FORCE_ACT: 6, BUY_GOAL: 7, NEXT_DAY: 8, FORCE_CHAT: 9, TALK_TURNS: 10, DELVE: 11, BOSS: 12 };
   const NAMES = {
     SEASON: ["spring", "summer", "autumn", "winter"],
     WEATHER: ["clear", "cloudy", "rain", "storm", "fog", "snow", "windy"],
@@ -480,6 +488,7 @@ textarea { width: 100%; box-sizing: border-box; height: 5.2em; font-family: var(
       const seed = (+$("dv-seed").value | 0) || ((Math.random() * 0x3fffffff) | 1);
       dbg(DBG.DELVE, (seed << 2) | +$("dv-biome").value);
     });
+    $("dv-boss-go").addEventListener("click", () => dbg(DBG.BOSS, +$("dv-boss").value));   // the hero stands in that boss's exit room and fights at once
     $("cards").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) dbg(DBG.SHOW_CARD, +b.dataset.v); });
     $("card-period").addEventListener("change", () => ex.set_option(0, +$("card-period").value));
     $("wifi-down").addEventListener("change", () => ex.set_net($("wifi-down").checked ? 1 : 0));

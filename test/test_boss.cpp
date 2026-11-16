@@ -1,12 +1,13 @@
-// R11 chunk B (docs/DESIGN-R11.md 9, tests 1, 5, 6, 7 and the engine part of 3, 4, 9): boss mapping and spawn, every
-// attack once, the shot pool, tired and forced end, the hit on the hero, determinism, work bound, aborts, drawing.
-// The hero is driven by the test (placed on a tile, put back when he is not stunned); hero.cpp has no ACT_BOSS yet.
+// R11 chunks B and C (docs/DESIGN-R11.md 9): boss mapping and spawn, every attack once, the shot pool, tired and forced
+// end, the hit on the hero, determinism, work bound, aborts, drawing (engine part: the test drives the hero); then the
+// hero's own fight through ACT_BOSS: every boss x seeds x tool levels x speeds x tick sizes, aborts, late start,
+// restore, and whole deep missions.
 #include "gq_test.h"
 #include "../lib/gamecore/src/world_priv.h"
 #include "../lib/gamecore/src/delve.h"
 #include "../lib/gamecore/src/boss.h"
 
-static const uint8_t HP[15] = {8, 10, 6, 9, 8, 10, 6, 8, 7, 8, 10, 8, 7, 6, 12};
+static const uint8_t HP[15] = {8, 8, 5, 5, 8, 10, 6, 8, 4, 8, 10, 8, 7, 4, 12};   // tuned against test_beatable
 
 // the world's move_actor (static there), so the test can move the boss and the hero's knockback slide
 static void mv(Actor* a, uint32_t dt) {
@@ -369,6 +370,282 @@ static void test_abort_draw() {
   std::printf("aborts and drawing ok\n");
 }
 
+
+// ============================================================ chunk C: the hero's fight (ACT_BOSS)
+enum { ACT_DELVE_T = 35, ACT_BOSS_T = 36 };
+
+static int hp_of(int boss) { return HP[boss]; }
+
+static void fresh_game(uint32_t seed, int sword, int boots, int minute = 8 * 60) {
+  sim_start(seed, minute);
+  gc_set_date(2026, 3, 3, 2, 1000);
+  gc_set_option(GC_OPT_SLEEP_MODE, 0);
+  G.s.day = 5;
+  G.s.tool[GQ_TOOL_PICK] = 1; G.s.tool[GQ_TOOL_LANTERN] = 1;
+  G.s.tool[GQ_TOOL_SWORD] = (uint8_t)sword; G.s.tool[GQ_TOOL_BOOTS] = (uint8_t)boots;
+  G.s.weather = GQ_W_CLEAR; G.s.weather_hours = 8;
+  G.s.hero_hearts = (uint8_t)hero_max_hearts();
+}
+
+// the nth level seed whose boss is `boss`
+static uint32_t nth_seed(int boss, int n) {
+  for (uint32_t s = 1;; s++) if (boss_for(boss / 5 + 1, s) == boss && n-- == 0) return s;
+}
+
+// A mission of the nth level of `boss` with the hero standing in its exit room (the mission state is as after a walk through the rooms).
+static void to_exit_room(int boss, int nth, int sword, int boots, int minute = 8 * 60) {
+  fresh_game(1000 + (uint32_t)nth, sword, boots, minute);
+  uint32_t seed = nth_seed(boss, nth);
+  G.s.dv_state = (uint8_t)(boss / 5 + 1); G.s.dv_seed = seed; G.s.dv_cur = delve_gen(seed)->exit;
+  G.s.dv_seen = 0; G.s.dv_min = G.s.dv_moves = 0; G.s.dv_day = (uint8_t)G.s.day;
+  hero_force_activity(ACT_DELVE_T);
+  world_instant_area(GQ_AREA_DELVE, SP_ENTRY);
+}
+
+struct FightStat { int win, hits, strikes, still_max, stun_max, bad; uint32_t ms; unsigned forced; };
+
+
+// A whole fight through the real hero: from the exit room's door until ACT_BOSS ends. `dt` = tick size.
+static FightStat run_fight(int boss, int nth, int sword, int boots, uint32_t dt, uint32_t max_ms = 130000) {
+  FightStat f;
+  std::memset(&f, 0, sizeof f);
+  to_exit_room(boss, nth, sword, boots);
+  uint32_t faints0 = (uint32_t)gc_query(GQ_Q_STAT_BASE + GQ_STAT_FAINTS);
+  unsigned forced0 = g_dbg_boss_forced, hits0 = g_dbg_boss_hits;
+  Actor* h = &A[A_HERO];
+  int started = 0, hearts = G.s.hero_hearts, last_tx = -1, last_ty = -1, bi = -1, prev_pose = POSE_NORMAL, hp_prev = 0, sw_tx = 0, sw_ty = 0, pbx = -9, pby = -9;
+  uint32_t last_move = 0, last_hit = 0, stun_ms = 0, ms = 0, clock0 = 0;
+  for (; ms < max_ms + 10000; ms += dt) {
+    gc_tick(dt);
+    if (h->act == ACT_BOSS_T) {
+      if (!started) { started = 1; bi = boss_slot(); CHECK(bi > 0 && A[bi].phase == boss + 1); pbx = tile_x(&A[bi]); pby = tile_y(&A[bi]); clock0 = boss_clock(); hp_prev = boss_hp(); CHECK(hp_prev == hp_of(boss)); }
+      uint32_t now = boss_clock();
+      int tx = tile_x(h), ty = tile_y(h);
+      if (tx != last_tx || ty != last_ty) { last_tx = tx; last_ty = ty; last_move = now; }
+      if (h->pose == POSE_SWING) {
+        if (prev_pose != POSE_SWING) {                          // a strike: next to him, not stunned, health down, no moving while the swing lasts
+          f.strikes++;
+          CHECK(std::abs(tx - pbx) + std::abs(ty - pby) == 1 && aligned(h) && boss_hp() < hp_prev);   // next to where he stood when the blow fell
+          sw_tx = tx; sw_ty = ty;
+        }
+        CHECK(tx == sw_tx && ty == sw_ty && h->plen == h->pidx && !boss_busy());
+        last_move = now;
+      }
+      prev_pose = h->pose;
+      hp_prev = boss_hp();
+      pbx = tile_x(&A[bi]); pby = tile_y(&A[bi]);
+      if (g_dbg_boss_hits - hits0 > (unsigned)f.hits) { f.hits++; if (f.hits > 1 && now - last_hit < 1400) f.bad++; last_hit = now; }
+      if (boss_busy()) { stun_ms += dt; if (stun_ms > (uint32_t)f.stun_max) f.stun_max = (int)stun_ms; last_move = now; } else stun_ms = 0;
+      if (now - last_move > (uint32_t)f.still_max) f.still_max = (int)(now - last_move);
+      // never leaves the room, never in a wall or on the boss, no heart is lost
+      CHECK(world_area() == GQ_AREA_DELVE && walkable(tx, ty) && !world_transition_busy());
+      if (aligned(h) && aligned(&A[bi]) && boss_hp() > 0) CHECK(tx != tile_x(&A[bi]) || ty != tile_y(&A[bi]));
+      CHECK(gc_query(GQ_Q_HERO_PRESENCE) == GQ_PRES_SPRITE);
+      CHECK(G.s.hero_hearts == hearts && (uint32_t)gc_query(GQ_Q_STAT_BASE + GQ_STAT_FAINTS) == faints0);
+      check_pool();
+    } else if (started) break;
+    else CHECK(ms < 20000);                                      // the fight starts within seconds
+  }
+  CHECK(started && live() == 0 && boss_result() == 1);
+  f.win = A[bi].counter == 0;
+  f.ms = boss_clock() - clock0;
+  f.forced = g_dbg_boss_forced - forced0;
+  CHECK(f.strikes >= 1);
+  return f;
+}
+
+static int cmp_u(const void* a, const void* b) { uint32_t x = *(const uint32_t*)a, y = *(const uint32_t*)b; return x < y ? -1 : x > y; }
+
+// Tests 2, 3, 4: every boss x seeds x sword 0 and 3 x both hero speeds x both tick sizes (33 and 250 ms).
+static void test_beatable(int nseeds) {
+  static uint32_t all[15 * 64 * 8];
+  int total = 0, under70 = 0;
+  for (int b = 0; b < 15; b++) {
+    uint32_t mine[64 * 8];
+    int n = 0, hits = 0, wins = 0, still = 0, stun = 0;
+    uint32_t worst = 0;
+    for (int seed = 0; seed < nseeds; seed++)
+      for (int sw = 0; sw < 2; sw++)
+        for (int boots = 0; boots < 2; boots++)
+          for (int d = 0; d < 2; d++) {
+            FightStat f = run_fight(b, seed, sw * 3, boots, d ? 250 : 33);
+            CHECK(f.win && f.forced == 0 && f.ms <= 110400 && f.bad == 0);   // won, the 110 s rule never needed, hits 1.4 s apart
+            CHECK(f.stun_max <= 1500 && f.still_max <= 6000);                // never stunned over 1.5 s, never idle over 6 s
+            wins += f.win; hits += f.hits;
+            if (f.ms > worst) worst = f.ms;
+            if (f.still_max > still) still = f.still_max;
+            if (f.stun_max > stun) stun = f.stun_max;
+            mine[n++] = f.ms; all[total++] = f.ms; under70 += f.ms < 70000;
+          }
+    qsort(mine, (size_t)n, sizeof mine[0], cmp_u);
+    std::printf("beatable: boss %2d: %d/%d won, median %5u ms, worst %6u ms, %4.1f hits per fight, longest idle %d ms, longest stun %d ms\n",
+                b, wins, n, (unsigned)mine[n / 2], (unsigned)worst, (double)hits / n, still, stun);
+  }
+  qsort(all, (size_t)total, sizeof all[0], cmp_u);
+  std::printf("beatable: %d fights, median %u ms, %d%% before 70 s\n", total, (unsigned)all[total / 2], under70 * 100 / total);
+  CHECK(under70 * 100 >= 95 * total);
+  CHECK(all[total / 2] >= 20000 && all[total / 2] <= 60000);
+}
+
+// ------------------------------------------------------------ aborts, late start, restore
+static int in_fight() { return A[A_HERO].act == ACT_BOSS_T && boss_result() == 0; }
+
+static void run_into_fight(uint32_t min_clock_ms) {
+  for (int k = 0; k < 4 * 60 && !(in_fight() && boss_clock() >= min_clock_ms); k++) sim_step();
+  CHECK(in_fight() && boss_clock() >= min_clock_ms);
+}
+
+static int home_within(int seconds) {   // seconds until he is in the village and idle with the mission over; -1 never
+  for (int s = 0; s < seconds; s++) {
+    for (int k = 0; k < 4; k++) sim_step();
+    if (G.s.dv_state == 0 && world_area() == GQ_AREA_VILLAGE && !world_transition_busy() && gc_query(GQ_Q_HERO_PRESENCE) == GQ_PRES_SPRITE) return s;
+  }
+  return -1;
+}
+
+static void test_aborts_late() {
+  // bed time (sleep mode 2) during a fight: back in the village within 2 minutes, pool empty, mission over
+  to_exit_room(1, 0, 0, 0);
+  run_into_fight(5000);
+  gc_set_option(GC_OPT_SLEEP_MODE, 2);
+  int s = home_within(120);
+  CHECK(s >= 0 && live() == 0 && boss_result() == 1 && boss_slot() < 0);
+  std::printf("abort: bed time during a fight, home after %d s\n", s);
+  // a festival during a fight (it starts at 16:00; the fight starts at 15:59)
+  int found = 0;
+  for (int day = 3; day < 400 && !found; day++) {
+    fresh_game(24, 0, 0, 15 * 60 + 59);
+    gc_debug(GQ_DBG_SET_DAY, day);
+    uint32_t seed = nth_seed(2, 1);
+    G.s.dv_state = 1; G.s.dv_seed = seed; G.s.dv_cur = delve_gen(seed)->exit; G.s.dv_seen = 0; G.s.dv_min = G.s.dv_moves = 0; G.s.dv_day = (uint8_t)G.s.day;
+    hero_force_activity(ACT_DELVE_T);
+    world_instant_area(GQ_AREA_DELVE, SP_ENTRY);
+    run_into_fight(0);
+    A[boss_slot()].counter = 200;                                // a fight that outlasts the minute
+    for (int k = 0; k < 4 * 90 && gc_query(GQ_Q_FESTIVAL) < 0 && in_fight(); k++) sim_step();
+    if (gc_query(GQ_Q_FESTIVAL) < 0) continue;
+    CHECK(boss_clock() < 70000 && A[A_HERO].act != ACT_BOSS_T);   // the festival, not the fight, ended it
+    found = 1;
+    int hs = home_within(120);
+    CHECK(hs >= 0 && live() == 0 && boss_result() == 1);
+    std::printf("abort: festival on day %d during a fight, home after %d s\n", day, hs);
+  }
+  CHECK(found);
+  // a forced activity in the middle of a fight: village at once, pool empty, the mission carries on afterwards
+  to_exit_room(5, 0, 0, 0);
+  run_into_fight(8000);
+  gc_debug(GQ_DBG_FORCE_ACT, GQ_ACT_FISH);
+  CHECK(world_area() == GQ_AREA_VILLAGE && G.s.dv_state == 2 && live() == 0 && boss_result() == 1 && boss_slot() < 0);
+  for (int k = 0; k < 4 * 60 * 20 && !(world_area() == GQ_AREA_DELVE && !world_transition_busy()); k++) sim_step();
+  CHECK(world_area() == GQ_AREA_DELVE);
+  // a late mission (minute 58, in the exit room) leaves without a fight and the boss stands untouched
+  to_exit_room(13, 0, 0, 0);
+  G.s.dv_min = 58;
+  int bs = boss_slot(), fought = 0;
+  CHECK(bs > 0 && A[bs].counter == hp_of(13));
+  for (int k = 0; k < 4 * 60 * 4 && G.s.dv_state; k++) { sim_step(); fought |= A[A_HERO].act == ACT_BOSS_T || live() > 0; }
+  CHECK(!fought && home_within(240) >= 0);
+  CHECK(boss_slot() < 0);
+  std::printf("late mission: no fight from minute 57\n");
+  // a fight that began at minute 56 may run on past 57 and still ends
+  to_exit_room(1, 1, 0, 0);
+  G.s.dv_min = 56;
+  run_into_fight(1000);
+  G.s.dv_min = 58;
+  for (int k = 0; k < 4 * 130 && in_fight(); k++) sim_step();
+  CHECK(!in_fight());
+}
+
+static void test_restore_fights() {
+  for (int b = 0; b < 15; b += 2) {
+    to_exit_room(b, 2, 0, 0);
+    run_into_fight(9000 + (uint32_t)b * 300);
+    uint8_t buf[GC_SAVE_BYTES];
+    CHECK(gc_save_export(buf, sizeof buf) == GC_SAVE_BYTES);
+    uint32_t seed = G.s.dv_seed;
+    // a different game, then the restore: the hero wakes in the village and walks back in
+    sim_start(900 + (uint32_t)b, 10 * 60);
+    CHECK(gc_save_import(buf, sizeof buf) == 1 && G.s.dv_state == b / 5 + 1 && G.s.dv_seed == seed && boss_for(G.s.dv_state, G.s.dv_seed) == b);
+    int met = 0, win = 0;
+    for (int k = 0; k < 4 * 60 * 15 && !win; k++) {
+      sim_step();
+      if (in_fight() && !met) { met = 1; CHECK(A[boss_slot()].phase == b + 1 && boss_hp() == hp_of(b)); }   // the same boss at full health
+      int bs = boss_slot();
+      if (met && bs >= 0 && A[bs].counter == 0) win = 1;
+    }
+    CHECK(met && win);
+  }
+  // a save from R10 (no boss concept: the mission fields only, reserved bytes zero) meets a boss
+  for (int biome = 1; biome <= 3; biome++) {
+    fresh_game(70 + (uint32_t)biome, 0, 0);
+    uint32_t seed = nth_seed((biome - 1) * 5 + biome, 0);
+    G.s.dv_state = (uint8_t)biome; G.s.dv_seed = seed; G.s.dv_cur = delve_gen(seed)->exit; G.s.dv_seen = 3; G.s.dv_min = 20; G.s.dv_moves = 12;
+    std::memset(G.s.reserved, 0, sizeof G.s.reserved);
+    uint8_t buf[GC_SAVE_BYTES];
+    CHECK(gc_save_export(buf, sizeof buf) == GC_SAVE_BYTES);
+    sim_start(80 + (uint32_t)biome, 10 * 60);
+    CHECK(gc_save_import(buf, sizeof buf) == 1 && G.s.dv_state == biome);
+    int met = 0, win = 0;
+    for (int k = 0; k < 4 * 60 * 15 && !win; k++) {
+      sim_step();
+      if (in_fight()) met = 1;
+      int bs = boss_slot();
+      if (met && bs >= 0 && A[bs].counter == 0) win = 1;
+    }
+    CHECK(met && win);
+  }
+  std::printf("restore: same boss at full health, R10 saves meet a boss\n");
+}
+
+// the preview's "Fight this boss": GQ_DBG_BOSS puts the hero into the boss room of a level with that boss
+static void test_debug_boss() {
+  for (int b = 0; b < 15; b++) {
+    fresh_game(500 + (uint32_t)b, 0, 0);
+    gc_debug(GQ_DBG_BOSS, b);
+    CHECK(world_area() == GQ_AREA_DELVE && boss_for(G.s.dv_state, G.s.dv_seed) == b && boss_slot() > 0 && A[boss_slot()].phase == b + 1);
+    run_into_fight(0);
+  }
+  gc_debug(GQ_DBG_BOSS, 15);   // out of range: nothing happens
+  std::printf("debug: all 15 bosses can be picked\n");
+}
+
+// ------------------------------------------------------------ whole missions (soak)
+static void test_soak_missions(int per_biome) {
+  int missions = 0, beaten = 0, fights = 0;
+  for (int biome = 1; biome <= 3; biome++)
+    for (int i = 0; i < per_biome; i++) {
+      fresh_game(3000 + (uint32_t)(biome * 100 + i), i % 3 == 2 ? 3 : i % 3, i & 1);
+      int faints0 = gc_query(GQ_Q_STAT_BASE + GQ_STAT_FAINTS);
+      gc_debug(GQ_DBG_DELVE, biome | (int)(((((uint32_t)(i + 1) * 2654435761u + (uint32_t)biome) & 0x3FFFFFFFu) | 1) << 2));
+      int exit_room = delve_gen(G.s.dv_seed)->exit, exit_min = -1, got = 0, fight_s = 0, home = 0, hearts = 0;
+      for (int s = 0; s < 66 * 60 && !home; s++) {
+        for (int k = 0; k < 4; k++) {
+          sim_step();
+          check_pool();
+          if (A[A_HERO].act != ACT_BOSS_T) CHECK(live() == 0);     // the shots never outlive the fight
+          if (A[A_HERO].act == ACT_BOSS_T) {
+            if (!hearts) hearts = G.s.hero_hearts;
+            if (boss_result() == 0) CHECK(G.s.hero_hearts == hearts);
+            CHECK(world_area() == GQ_AREA_DELVE && walkable(tile_x(&A[A_HERO]), tile_y(&A[A_HERO])));
+          } else hearts = 0;
+          CHECK(gc_query(GQ_Q_HERO_PRESENCE) != GQ_PRES_NONE);
+        }
+        if (G.s.dv_state && world_area() == GQ_AREA_DELVE && G.s.dv_cur == exit_room && exit_min < 0) exit_min = G.s.dv_min;
+        int bs = boss_slot();
+        if (bs >= 0 && A[bs].counter == 0) got = 1;
+        fight_s += A[A_HERO].act == ACT_BOSS_T;
+        CHECK(G.s.dv_min <= 60 && G.s.dv_moves <= 90);
+        home = G.s.dv_state == 0 && world_area() == GQ_AREA_VILLAGE && !world_transition_busy() && s > 60;
+      }
+      CHECK(home && gc_query(GQ_Q_STAT_BASE + GQ_STAT_FAINTS) == faints0);
+      if (exit_min >= 0 && exit_min <= 55) CHECK(got);
+      CHECK(fight_s <= 130);
+      missions++; beaten += got; fights += fight_s > 0;
+    }
+  std::printf("soak: %d whole missions, %d bosses beaten (%d fights seen)\n", missions, beaten, fights);
+  CHECK(beaten * 100 >= missions * 80);
+}
+
 int main() {
   sim_start(7);
   gc_set_date(2026, 3, 3, 2, 1000);
@@ -380,6 +657,11 @@ int main() {
   test_mine_hit();
   test_determinism_work();
   test_abort_draw();
+  test_beatable(std::getenv("BOSS_SEEDS") ? std::atoi(std::getenv("BOSS_SEEDS")) : 40);
+  test_aborts_late();
+  test_restore_fights();
+  test_debug_boss();
+  test_soak_missions(std::getenv("BOSS_SOAK") ? std::atoi(std::getenv("BOSS_SOAK")) : 12);
   std::printf("test_boss: all ok\n");
   return 0;
 }

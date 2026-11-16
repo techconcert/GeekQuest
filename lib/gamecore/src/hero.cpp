@@ -4,8 +4,9 @@
 // its own timeout, talking flags of villagers time out by themselves (npc.cpp).
 #include "world_priv.h"
 #include "delve.h"
+#include "boss.h"
 
-enum { ACT_NONE = GQ_ACT_NONE, ACT_HOME = 32, ACT_BREAKFAST = 33, ACT_FEST = 34, ACT_DELVE = 35 };
+enum { ACT_NONE = GQ_ACT_NONE, ACT_HOME = 32, ACT_BREAKFAST = 33, ACT_FEST = 34, ACT_DELVE = 35, ACT_BOSS = 36 };
 
 static const char* const PLACE_NAME[4] = {"CAVES", "RUINS", "FOREST", "TOWER"};
 static const uint8_t PLACE_ICON[4] = {T_ROCK, T_FENCE, T_WATER, T_WALL_DOOR};
@@ -85,6 +86,7 @@ static void tidy(Actor* h) {
 }
 
 static void begin(Actor* h, int act) {
+  if (h->act == ACT_BOSS) boss_clear();                // however he leaves a fight, the shots go
   h->act = (uint8_t)act; h->phase = 0; h->counter = 0; h->timer = 0;
   s_act_ms = 0; s_phase_ms = 0; s_key = 0xFFFF;
   T.on = 0;
@@ -571,8 +573,8 @@ static void quest_step(Actor* h, uint32_t dt) {
 
 // ---- the mission: a supervisor over the fight, mine, forage and wander machines (they hand back through finish()).
 // phase 0 start / resume, 1 walk to the entrance, 2 decide, 3 walk (s_dv_t), 5 wait at the chest, 6 curtain home
+static const uint8_t CH[4][2] = {{0, 0}, {GQ_ITEM_WOOD, GQ_ITEM_HERB}, {GQ_ITEM_STONE, GQ_ITEM_ORE}, {GQ_ITEM_ORE, GQ_ITEM_GEL}};   // [1] is the boss trophy
 static void delve_loot(Actor* h) {   // a chest: two goods of the biome, coins, a heart
-  static const uint8_t CH[4][2] = {{0, 0}, {GQ_ITEM_WOOD, GQ_ITEM_HERB}, {GQ_ITEM_STONE, GQ_ITEM_ORE}, {GQ_ITEM_ORE, GQ_ITEM_GEL}};
   for (int i = 0; i < 2; i++) { int it = CH[G.s.dv_state & 3][i]; gain(it, 1); h->emote = (int8_t)item_icon(it); }
   find_coins(h);
   if (G.s.hero_hearts < hero_max_hearts()) G.s.hero_hearts++;
@@ -607,10 +609,11 @@ static void delve_step(Actor* h, uint32_t dt) {
     }
     case 2: {
       if (world_transition_busy()) return;
+      if (boss_begin(h)) { begin(h, ACT_BOSS); return; }   // the boss of the way out first, before anything else
       int k = delve_kind(r), exit_mode = G.s.dv_min >= 48, i = s_dv_n++;
       if (!((G.s.dv_seen >> r) & 1) && !exit_mode && i < 14) {   // first visit, about 90 s: look around
-        // in this order: fight, chest, a node, a second fight at the way out; else wander
-        if ((i == 0 || (i == 3 && (k & DK_EXIT))) && G.s.hero_hearts >= 2 && npc_monster_slot(0) >= 0) {
+        // in this order: fight, chest, a node; else wander
+        if (i == 0 && G.s.hero_hearts >= 2 && npc_monster_slot(0) >= 0) {
           begin(h, GQ_ACT_FIGHT); h->phase = 2; return;
         }
         if (i == 1 && (k & DK_CHEST) && world_spot(SP_SITE, &x, &y)) { tv_start(GQ_AREA_DELVE, x, y); s_dv_t = 5; h->phase = 3; return; }
@@ -657,6 +660,28 @@ static void delve_step(Actor* h, uint32_t dt) {
       finish(h);   // the line stays on screen; the next activity waits for it
       return;
   }
+}
+
+// R11: the boss fight. boss_step() does the whole hero side; here only the start (delve_step), the reward and the end.
+static void boss_act(Actor* h) {
+  if (h->phase) {   // after the win: he cheers while the boss poofs
+    if (h->timer <= 0) { boss_clear(); finish(h); }
+    return;
+  }
+  int r = boss_step(h);
+  if (!r && (sleep_due() || cal_festival() >= 0)) r = 1;   // the mission will end by itself
+  if (r == 1) { boss_clear(); finish(h); return; }
+  if (r != 2) return;
+  char buf[40];
+  boss_name(A[boss_slot()].phase - 1, buf);
+  cat(buf, 40, "|IS BEATEN!");
+  say_hero(buf, 2500);
+  G.s.hero_hearts = (uint8_t)hero_max_hearts();
+  find_coins(h);
+  gain(CH[G.s.dv_state & 3][1], 1);
+  gq_emit(GQ_EV_SLAIN, GQ_MON_GHOST, 0);
+  gq_touch();
+  h->pose = POSE_CHEER; h->timer = 1100; h->phase = 1;
 }
 
 // -------------------------------------------------------------------- the rest
@@ -1148,6 +1173,7 @@ static void hero_step(Actor* h, uint32_t dt) {
     case GQ_ACT_QUEST: quest_step(h, dt); break;
     case GQ_ACT_FIGHT: fight_step(h, dt); break;
     case ACT_DELVE: delve_step(h, dt); break;
+    case ACT_BOSS: boss_act(h); break;
 
     case GQ_ACT_CAT:
       switch (h->phase) {
@@ -1304,6 +1330,7 @@ int hero_activity(void) {
   if (a == ACT_FEST) return GQ_ACT_SIT;
   if (a == ACT_HOME) return GQ_ACT_NONE;
   if (a == ACT_DELVE) return GQ_ACT_QUEST;
+  if (a == ACT_BOSS) return GQ_ACT_FIGHT;
   return a >= 0 && a < GQ_ACT_COUNT ? a : GQ_ACT_NONE;
 }
 
@@ -1325,6 +1352,17 @@ void hero_force_delve(int b, uint32_t seed) {
   if (b < 1 || b > 3) return;
   delve_start(b, seed ? seed : 1);
   hero_force_activity(ACT_DELVE);
+}
+
+// gc_debug(GQ_DBG_BOSS): the mission of a level whose boss is b (0..14), the hero already in its exit room.
+void hero_force_boss(int b) {
+  if (b < 0 || b >= BOSS_COUNT) return;
+  uint32_t seed = 1;
+  while (boss_for(b / 5 + 1, seed) != b) seed++;
+  delve_start(b / 5 + 1, seed);
+  G.s.dv_cur = delve_gen(seed)->exit;
+  hero_force_activity(ACT_DELVE);
+  world_instant_area(GQ_AREA_DELVE, SP_ENTRY);
 }
 
 // gc_debug(GQ_DBG_FORCE_CHAT): a chat with villager npc (0 = anyone) from a clean state.
@@ -1362,6 +1400,7 @@ void hero_status_text(char* buf, int cap) {
   if (cap < 2) return;
   if (G.s.dv_state && (a == ACT_DELVE || world_area() == GQ_AREA_DELVE)) {   
     int in = world_area() == GQ_AREA_DELVE;
+    if (a == ACT_BOSS && boss_band(buf, cap)) return;   // "RATTLE KING HP 5"
     st_cat(buf, cap, "DEEP ", hero_place_name(DV_PL[G.s.dv_state & 3]));   // "DEEP CAVES", then "DEEP CAVES 12/24" inside
     if (in) {
       int c = 1;

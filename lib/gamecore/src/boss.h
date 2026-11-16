@@ -45,31 +45,43 @@ struct BossShot {          // 8 bytes; a slot with life 0 is free
 #define BOSS_GUARD 1       // host builds: one extra slot after the pool that must stay zero (test)
 extern unsigned g_dbg_boss_work;     // shot sub-steps (each with its hit test) since the test reset it
 extern unsigned g_dbg_boss_forced;   // fights ended by the 110 s rule
+extern unsigned g_dbg_boss_hits;     // hits on the hero (boss_took_hit is consumed by the hero's own step)
 #else
 #define BOSS_GUARD 0
 #endif
 extern BossShot g_bshot[BOSS_SHOTS + BOSS_GUARD];
 
+struct BossFight {
+  uint32_t ms;                   // fight clock
+  uint16_t acc;                  // sub-step accumulator, ms
+  int32_t  t, flash, stun;       // timer of the boss state; boss blink left; hero stun + grace left (stun while > 800)
+  uint32_t rdy;                  // clock time of the hero's next swing
+  uint8_t  slot, st, ai, rot, walk, hc, atk, res, on, hit, hand, dir;   // hand: which way he circles; dir: his last step 0..3
+};
+extern BossFight g_bf;
+
 // ---- room and spawn
 int  boss_for(int biome, uint32_t seed);      // biome 1..3 (dv_state), seed: the boss number 0..14, a pure function
 void boss_init_actor(Actor* a, int b);        // phase = b + 1, counter = health, ms_per_px from the row
-void boss_name(int b, char* out);             // at least 12 bytes
+int  boss_name(int b, char* out);             // b = 0..14; out has at least 12 bytes; returns the length
 int  boss_band(char* buf, int cap);           // "<NAME> HP <n>" of the live boss; 0 when there is none
-int  boss_cur(void);                          // number 0..14 of the live boss of this room or -1
 int  boss_slot(void);                         // its actor slot or -1
 
 // ---- fight control
 int  boss_begin(Actor* h);                    // see above; resets clock, health stays as spawned
 void boss_clear(void);                        // empties the pool, ends the fight (result 1)
 void boss_tick(uint32_t dt);                  // world_tick(): state machine, shots, hit, timers
-int  boss_result(void);                       // 0 running, 1 ended without a win (or none), 2 beaten
 int  boss_busy(void);                         // 1 while the hero is stunned or still sliding back
 int  boss_strike(void);                       // the hero's blow lands; 1 = boss dead
-int  boss_took_hit(void);                     // 1 once after the hero was hit (consumed): circle the other way
+int  boss_step(Actor* h);                     // the hero's whole fight, each tick: 0 running, 1 ended, 2 beaten
 
 // ---- what the hero's decision needs
-int  boss_phase(void);                        // BS_*
-int  boss_telegraph(void);                    // 0, or BA_* + 1 of the attack being telegraphed / the charge running
-int  boss_hp(void);
-uint32_t boss_clock(void);                    // ms of the fight
 // live shots: the pool g_bshot (centre x/16, y/16, vx, vy per 32 ms step, life 0 = free)
+
+// small accessors (inline: the hero's step and the tests use them; nothing is compiled unless used)
+static inline int boss_result(void) { return g_bf.res; }                 // 0 running, 1 ended without a win (or none), 2 beaten
+static inline int boss_took_hit(void) { int r = g_bf.hit; g_bf.hit = 0; return r; }   // 1 once after the hero was hit (consumed)
+static inline int boss_phase(void) { return g_bf.st; }                   // BS_*
+static inline int boss_telegraph(void) { return g_bf.on && (g_bf.st == BS_TELE || g_bf.st == BS_CHARGE) ? g_bf.atk + 1 : 0; }   // 0, or BA_* + 1 of the attack being telegraphed / the charge running
+static inline int boss_hp(void) { return A[g_bf.slot].counter; }
+static inline uint32_t boss_clock(void) { return g_bf.ms; }              // ms of the fight

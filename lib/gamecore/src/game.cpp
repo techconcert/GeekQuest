@@ -287,6 +287,7 @@ extern "C" void gc_debug(int cmd, int32_t arg) {
     case GQ_DBG_FORCE_CHAT: hero_force_chat(arg); break;
     case GQ_DBG_TALK_TURNS: G.dbg_turns = (uint8_t)(arg >= 2 && arg <= 4 ? arg : 0); break;
     case GQ_DBG_DELVE: hero_force_delve(arg & 3, (uint32_t)arg >> 2); break;
+    case GQ_DBG_BOSS: hero_force_boss(arg); break;
     default: break;
   }
 }

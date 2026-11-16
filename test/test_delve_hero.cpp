@@ -5,6 +5,7 @@
 #include "gq_test.h"
 #include "../lib/gamecore/src/world_priv.h"
 #include "../lib/gamecore/src/delve.h"
+#include "../lib/gamecore/src/boss.h"
 
 enum { BIOME_FOREST = 1, BIOME_CAVE = 2, BIOME_RUINS = 3 };
 
@@ -26,6 +27,7 @@ static void fresh(uint32_t seed, int minute = 10 * 60) {
 
 struct MStat {
   int ended, secs, moves, rooms, exit_reached, faints, max_room_s, presence_bad, mins, hearts_min, inv_over;
+  int exit_min, beaten, fight_s;   // R11: dv_min on first arrival in the exit room (-1 never), boss beaten, seconds in ACT_BOSS
   long coins_found;
 };
 
@@ -39,7 +41,7 @@ static void check_caps(MStat* m) {
 static MStat run_mission(int biome, uint32_t seed, int max_min = 66) {
   MStat m;
   std::memset(&m, 0, sizeof m);
-  m.hearts_min = 99;
+  m.hearts_min = 99; m.exit_min = -1;
   fresh(seed * 3 + (uint32_t)biome);
   int faints0 = gc_query(GQ_Q_STAT_BASE + GQ_STAT_FAINTS);
   uint32_t lvl = ((seed * 2654435761u) & 0x3FFFFFFFu) | 1;
@@ -57,7 +59,10 @@ static MStat run_mission(int biome, uint32_t seed, int max_min = 66) {
     if (in_delve() && G.s.dv_state) {
       if (G.s.dv_cur == last_room) room_s++; else { last_room = G.s.dv_cur; room_s = 0; }
       if (room_s > m.max_room_s) m.max_room_s = room_s;
-      if (G.s.dv_cur == exit_room) m.exit_reached = 1;
+      if (G.s.dv_cur == exit_room) { if (!m.exit_reached) m.exit_min = G.s.dv_min; m.exit_reached = 1; }
+      int bs = boss_slot();
+      if (bs >= 0 && A[bs].counter == 0) m.beaten = 1;
+      if (A[A_HERO].act == 36) m.fight_s++;
     }
     if (started && hero_home_and_idle()) { m.ended = 1; break; }
   }
@@ -71,7 +76,8 @@ static MStat run_mission(int biome, uint32_t seed, int max_min = 66) {
 // ---------------------------------------------------------------- 6. missions end
 static void test_missions() {
   const int SEEDS = 60;
-  int total = 0, ended = 0, reached = 0;
+  int total = 0, ended = 0, reached = 0, beaten = 0;
+  long fights_s = 0;
   long rooms = 0, secs_sum = 0, room_s_worst = 0, moves_worst = 0, min_worst = 0, secs_worst = 0;
   for (int biome = 1; biome <= 3; biome++) {
     int b_total = 0, b_exit = 0;
@@ -85,6 +91,10 @@ static void test_missions() {
       CHECK(m.inv_over == 0);
       CHECK(m.moves <= 90 && m.mins <= 60);
       CHECK(m.max_room_s <= 300);           // never stuck in a room
+      if (m.exit_min >= 0 && m.exit_min <= 55) CHECK(m.beaten);   // R11: a mission that reaches the way out in time beats its boss
+      if (m.exit_min >= 57) CHECK(!m.beaten);                      // and one that is late walks past it
+      CHECK(m.fight_s <= 130);                                     // a fight lasts at most 110 s of boss clock
+      beaten += m.beaten; fights_s += m.fight_s;
       ended += m.ended; reached += m.exit_reached; b_exit += m.exit_reached;
       rooms += m.rooms; b_rooms += m.rooms; secs_sum += m.secs; b_secs += m.secs;
       if (m.max_room_s > room_s_worst) room_s_worst = m.max_room_s;
@@ -95,6 +105,7 @@ static void test_missions() {
     std::printf("biome %d: %d missions, exit reached in %d, %.1f rooms left, %.1f min\n", biome, b_total, b_exit,
                 (double)b_rooms / b_total, (double)b_secs / b_total / 60.0);
   }
+  std::printf("bosses: %d beaten in %d missions, %.1f s of fight on average\n", beaten, total, (double)fights_s / (beaten ? beaten : 1));
   std::printf("missions: %d ended %d, exit %d, avg rooms %.1f, avg %.1f min, worst: room %lds moves %ld min %ld total %lds\n",
               total, ended, reached, (double)rooms / total, (double)secs_sum / total / 60.0, room_s_worst, moves_worst, min_worst, secs_worst);
   CHECK(ended == total);

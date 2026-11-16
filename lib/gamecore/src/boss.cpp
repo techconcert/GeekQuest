@@ -5,7 +5,7 @@
 
 BossShot g_bshot[BOSS_SHOTS + BOSS_GUARD];
 #if !defined(ARDUINO_ARCH_ESP8266)
-unsigned g_dbg_boss_work, g_dbg_boss_forced;
+unsigned g_dbg_boss_work, g_dbg_boss_forced, g_dbg_boss_hits;
 #endif
 
 enum { K_BURST, K_CHARGE, K_HOP };
@@ -32,23 +32,23 @@ static const uint8_t SPEED[4] GC_ROM_ATTR = {0, 15, 22, 31};   // 1/16 px per 32
 static const uint16_t MASK[5] GC_ROM_ATTR = {0x0001, 0x8003, 0xC007, 0x1111, 0x5555};   // single spread fan cross ring
 static const uint8_t COS5[5] GC_ROM_ATTR = {16, 15, 11, 6, 0};
 
-struct BossRow { uint8_t hp, ms, walk, cd, icon, atk[3], flags; };   // 9 bytes; cd in 100 ms; flags reserved
+struct BossRow { uint8_t hp, ms, walk, cd, icon, atk[3]; };   // 8 bytes; cd in 100 ms
 static const BossRow BOSS[BOSS_COUNT] GC_ROM_ATTR = {
-  {8, 40, 2, 16, WI_HERB, {BA_CHARGE, BA_SPREAD, BA_CHARGE}, 0},      // THORNBACK
-  {10, 0, 0, 14, I_WOOD, {BA_SLAM, BA_SHOT, BA_FAN}, 0},              // OLD STUMP
-  {6, 30, 3, 10, I_BOBBER, {BA_BOLT, BA_HOP, BA_BOLT}, 0},            // QUEEN BEE
-  {9, 0, 0, 15, WI_GEL, {BA_HOP, BA_RING, BA_MINE}, 0},               // MOSSMAW
-  {8, 90, 1, 12, WI_MUSHROOM, {BA_SPIRAL, BA_SPIRAL, BA_MINE}, 0},    // CAPTAIN CAP
-  {10, 80, 2, 16, WI_STONE, {BA_SLAM, BA_CROSS, BA_SLAM}, 0},         // ROCKJAW
-  {6, 30, 3, 10, WI_POOF2, {BA_CHARGE, BA_CHARGE, BA_FAN}, 0},        // GLOOMWING
-  {8, 60, 2, 14, WI_GEM, {BA_CROSS, BA_XSHOT, BA_SPREAD}, 0},         // SHARDSHELL
-  {7, 0, 0, 13, WI_ORE, {BA_HOP, BA_RING, BA_SHOT}, 0},               // BORER
-  {8, 55, 3, 12, WI_BERRY, {BA_MINE, BA_SPREAD, BA_MINE}, 0},         // CINDER
-  {10, 45, 2, 15, WI_SWORD_UP, {BA_CHARGE, BA_BOLT, BA_CROSS}, 0},    // THE WARDEN
-  {8, 70, 2, 14, WI_SHELL, {BA_FAN, BA_RING, BA_SHOT}, 0},            // RATTLE KING
-  {7, 0, 0, 10, I_BOBBER, {BA_BOLT, BA_BOLT, BA_SPIRAL}, 0},          // THE EYE
-  {6, 0, 0, 12, I_STAR, {BA_HOP, BA_SPREAD, BA_XSHOT}, 0},            // HEX
-  {12, 0, 0, 13, WI_STONE, {BA_CROSS, BA_XSHOT, BA_SLAM}, 0},         // STONE IDOL
+  {8, 40, 2, 16, WI_HERB, {BA_CHARGE, BA_SPREAD, BA_CHARGE}},      // THORNBACK
+  {8, 0, 0, 14, I_WOOD, {BA_SLAM, BA_SHOT, BA_FAN}},              // OLD STUMP
+  {5, 30, 3, 10, I_BOBBER, {BA_BOLT, BA_HOP, BA_BOLT}},            // QUEEN BEE
+  {5, 0, 0, 15, WI_GEL, {BA_HOP, BA_RING, BA_MINE}},               // MOSSMAW
+  {8, 90, 1, 12, WI_MUSHROOM, {BA_SPIRAL, BA_SPIRAL, BA_MINE}},    // CAPTAIN CAP
+  {10, 80, 2, 16, WI_STONE, {BA_SLAM, BA_CROSS, BA_SLAM}},         // ROCKJAW
+  {6, 30, 3, 10, WI_POOF2, {BA_CHARGE, BA_CHARGE, BA_FAN}},        // GLOOMWING
+  {8, 60, 2, 14, WI_GEM, {BA_CROSS, BA_XSHOT, BA_SPREAD}},         // SHARDSHELL
+  {4, 0, 0, 13, WI_ORE, {BA_HOP, BA_RING, BA_SHOT}},               // BORER
+  {8, 55, 3, 12, WI_BERRY, {BA_MINE, BA_SPREAD, BA_MINE}},         // CINDER
+  {10, 45, 2, 15, WI_SWORD_UP, {BA_CHARGE, BA_BOLT, BA_CROSS}},    // THE WARDEN
+  {8, 70, 2, 14, WI_SHELL, {BA_FAN, BA_RING, BA_SHOT}},            // RATTLE KING
+  {7, 0, 0, 10, I_BOBBER, {BA_BOLT, BA_BOLT, BA_SPIRAL}},          // THE EYE
+  {4, 0, 0, 12, I_STAR, {BA_HOP, BA_SPREAD, BA_XSHOT}},            // HEX
+  {12, 0, 0, 13, WI_STONE, {BA_CROSS, BA_XSHOT, BA_SLAM}},         // STONE IDOL
 };
 #define BR(b, f) GC_RD8(&BOSS[b].f)
 
@@ -58,13 +58,9 @@ static const char NAMES[] GC_ROM_ATTR =
   "THE WARDEN\0RATTLE KING\0THE EYE\0HEX\0STONE IDOL";
 #endif
 
-// fight state
-static struct {
-  uint32_t ms;                   // fight clock
-  uint16_t acc;                  // sub-step accumulator, ms
-  int32_t  t, flash, stun;       // timer of the boss state; boss blink left; hero stun + grace left (stun while > 800)
-  uint8_t  slot, st, ai, rot, walk, hc, atk, res, on, hit;
-} F;
+// fight state: g_bf (boss.h)
+#define F g_bf
+BossFight g_bf;
 
 static int tx_(const Actor* a) { return (a->x + 8) >> 4; }
 static int ty_(const Actor* a) { return (a->y + 8) >> 4; }
@@ -84,20 +80,20 @@ void boss_init_actor(Actor* a, int b) {
   a->phase = (uint8_t)(b + 1);
   a->counter = BR(b, hp);
   a->ms_per_px = (uint8_t)boss_ms(b);
-  a->bob = 0;
 }
 
-void boss_name(int b, char* out) {
+int boss_name(int b, char* out) {               // returns the length
 #if BOSS_CUT_NAMES
   (void)b;
   str_copy(out, "BOSS", 5);
+  return 4;
 #else
   const char* p = NAMES;
-  if (b < 0 || b >= BOSS_COUNT) b = 0;
   while (b-- > 0) while (GC_RD8(p++)) {}
   int i = 0;
-  for (char c; (c = (char)GC_RD8(p++)) && i < 11;) out[i++] = c;
+  for (char ch; (ch = (char)GC_RD8(p++));) out[i++] = ch;
   out[i] = 0;
+  return i;
 #endif
 }
 
@@ -109,8 +105,7 @@ int boss_slot(void) {
 int boss_band(char* buf, int cap) {
   int s = boss_slot();
   if (s < 0 || cap < 20) return 0;
-  boss_name(A[s].phase - 1, buf);
-  int n = str_len(buf);
+  int n = boss_name(A[s].phase - 1, buf);
   str_copy(buf + n, " HP ", 5);
   itoa_into(buf + n + 4, A[s].counter);
   return 1;
@@ -130,10 +125,8 @@ static void pool_clear(void) {
   for (int i = 0; i < BOSS_SHOTS; i++) if (g_bshot[i].life) { shot_rows(&g_bshot[i]); g_bshot[i].life = 0; }
 }
 
-static int hero_dest(void) {
-  const Actor* h = &A[A_HERO];
-  return h->pidx < h->plen ? h->path[h->pidx] : TI(tx_(h), ty_(h));
-}
+static int dest(const Actor* h) { return h->pidx < h->plen ? h->path[h->pidx] : TI(tx_(h), ty_(h)); }
+static int hero_dest(void) { return dest(&A[A_HERO]); }
 
 static int cosd(int d) {   // 16 * cos(d * 22.5 degrees)
   d &= 15;
@@ -171,9 +164,13 @@ static void hurt(int vx, int vy) {
   int sx = 0, sy = 0, tx = tx_(h), ty = ty_(h), n = 0;
   if (ab(vx) > ab(vy)) sx = sgn(vx); else sy = vy > 0 ? 1 : -1;
   for (int k = 1; k <= 2 && !BOSS_CUT_KNOCKBACK && walkable(tx + sx * k, ty + sy * k); k++, n++) h->path[n] = TI(tx + sx * k, ty + sy * k);
+  if (!n && !aligned(h)) h->path[n++] = TI(tx, ty);   // blocked while between tiles: settle on the tile he is on
   h->pidx = 0; h->plen = (uint8_t)n;
   h->pose = POSE_HURT; h->timer = 0;
   F.stun = STUN_MS; F.hit = 1;
+#if !defined(ARDUINO_ARCH_ESP8266)
+  g_dbg_boss_hits++;
+#endif
 }
 
 static void shots(uint32_t dt) {
@@ -293,7 +290,7 @@ static void machine(Actor* b, uint32_t dt) {
 // ---- control
 int boss_begin(Actor* h) {
   int s = boss_slot();
-  if (s < 0 || !A[s].visible || !A[s].counter || G.s.dv_min >= 57 || world_area() != GQ_AREA_DELVE) return 0;
+  if (s < 0 || !A[s].counter || G.s.dv_min >= 57) return 0;
   int ok = find_path(h, tx_(&A[s]), ty_(&A[s]));   // the boss's own tile is walkable: a path to it exists iff he can reach him
   h->plen = h->pidx = 0;
   if (!ok) return 0;
@@ -345,10 +342,52 @@ int boss_strike(void) {
   return 1;
 }
 
-int boss_result(void) { return F.res; }
 int boss_busy(void) { return F.on && (F.stun > 800 || (F.stun > 0 && !arrived(&A[A_HERO]))); }
-int boss_took_hit(void) { int r = F.hit; F.hit = 0; return r; }
-int boss_phase(void) { return F.st; }
-int boss_telegraph(void) { return F.on && (F.st == BS_TELE || F.st == BS_CHARGE) ? F.atk + 1 : 0; }
-int boss_hp(void) { return A[F.slot].counter; }
-uint32_t boss_clock(void) { return F.ms; }
+
+// ---- the hero's fight (ACT_BOSS): one decision each time he stands on a tile. Integer only, no random numbers.
+static const int8_t DXY[5] = {1, 0, -1, 0, 1};     // direction k (east south west north): dx = DXY[k], dy = DXY[k + 1]
+
+static int shot_cost(int x, int y, int n) {   // 40 for every predicted shot position in a 16 pixel box around the tile
+  int cost = 0;
+  for (int i = 0; i < BOSS_SHOTS; i++) {
+    const BossShot* s = &g_bshot[i];
+    if (!s->life) continue;
+    for (int j = 1; j < 4; j++) {
+      int k = j * n / 2;
+      cost += 40 * (ab(((s->x + s->vx * k) >> 4) - x * 16 - 8) < 8 && ab(((s->y + s->vy * k) >> 4) - y * 16 - 8) < 8);
+    }
+  }
+  return cost;
+}
+
+int boss_step(Actor* h) {                          // 0 running, 1 ended, 2 beaten
+  if (F.res) return F.res;
+  F.hand ^= (uint8_t)boss_took_hit();
+  if (boss_busy()) return 0;
+  if (h->pose == POSE_SWING) { if (h->timer > 0) return 0; h->pose = POSE_NORMAL; }
+  if (!arrived(h)) return 0;
+  const Actor* b = &A[F.slot];
+  int hx = tile_x(h), hy = tile_y(h), bx = tx_(b), by = ty_(b), n = h->ms_per_px / 2, tel = boss_telegraph(); if (tel == BA_HOP + 1) tel = 0;
+  int md = ab(hx - bx) + ab(hy - by), goal = -1, rdy = F.ms >= F.rdy && !tel;
+  if (rdy && md == 1 && aligned(b) && !shot_cost(hx, hy, n)) {   // next to him and safe: strike
+    face(h, bx, by);
+    h->pose = POSE_SWING; h->timer = 260;
+    F.rdy = F.ms + 700;
+    boss_strike();
+    return F.res;
+  }
+  if (rdy && md > 1 && find_path(h, bx, by)) goal = h->path[0];
+  h->plen = h->pidx = 0;
+  int best = 1 << 30, pick = -1, pk = 0;
+  for (int c = 0; c < 5; c++) {
+    int k = (F.dir + (c < 2 ? 0 : c == 4 ? 2 : 1 + 2 * ((c & 1) ^ F.hand))) & 3;
+    int x = hx + (c ? DXY[k] : 0), y = hy + (c ? DXY[k + 1] : 0), dx = x - bx, dy = y - by;
+    if ((unsigned)(x - 1) > 12u || (unsigned)(y - 1) > 12u || !walkable(x, y) || TI(x, y) == TI(bx, by) || TI(x, y) == dest(b)) continue;
+    int cr = !dx || !dy, cost = shot_cost(x, y, n) + (c == 0) + 2 * (c == 4) - 2 * (c == 1);
+    if (tel) cost += 40 * ((ab(dx) < 3 && ab(dy) < 3) + (cr && (tel == BA_CHARGE + 1 || tel == BA_CROSS + 1)) + (ab(dx) == ab(dy) && tel == BA_XSHOT + 1));
+    cost += goal < 0 ? 4 * ab(ab(dx) + ab(dy) - 3) + 3 * cr : -50 * (TI(x, y) == goal);
+    if (cost < best) { best = cost; pick = c ? TI(x, y) : -1; pk = k; }
+  }
+  if (pick >= 0) { h->path[0] = (uint8_t)pick; h->plen = 1; F.dir = (uint8_t)pk; }
+  return 0;
+}
