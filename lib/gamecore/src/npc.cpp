@@ -281,6 +281,7 @@ void npc_tick(int i, uint32_t dt) {
       wander(n, 2, 2500, 7000);
       return;
     case AK_CRITTER:
+      if (!walkable((n->x + 8) >> 4, (n->y + 8) >> 4)) { n->kind = AK_NONE; return; }   // an object (a built project) landed on it: it flies off
       if (!arrived(n) || n->timer > 0) return;
       if (n->id == CR_BUTTERFLY || n->id == CR_FIREFLY) wander(n, 3, 300, 900);
       else wander(n, 2, 1500, 4000);
