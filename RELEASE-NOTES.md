@@ -1,7 +1,6 @@
-What is new in GeekQuest r11:
+What is new in GeekQuest r12:
 
-- 15 bosses, five per biome: every deep mission now ends in a boss room, and the level seed picks which boss waits there. Each boss has its own sprite and its own cycle of attacks (shots, spreads, rings, spirals, slams, mines, charges, teleport hops).
-- The hero fights them without hearts: he dodges by reading where the shots will go, steps in to strike when it is safe, and a hit only knocks him back and stuns him briefly. The band shows the boss name and health. Fights end by themselves and the mission time limit still applies.
-- The bottom band now also shows the weekday and date, for example SAT NOV 14, 2026 (only when the clock knows the time).
-- The hero stays on each task about 25% longer before moving to the next one. Sleep times are unchanged.
-- The preview has a "Fight this boss" picker to watch any of the 15 bosses.
+- New "Switch game mode" area under Firmware update: pick GeekQuest or GeekQuestAI, see the version, confirm, and the clock installs that game's latest build through the normal update upload.
+- A game's saved progress does not carry over to another game; the other game starts fresh.
+- The update page keeps working as before (choose a file by hand, "Check for a new version", the checks before installing, the rescue hotspot). The new part is a separate script, so if it ever fails the upload still works.
+- Flash this one by hand once: older builds do not have the switcher.
