@@ -55,7 +55,7 @@ static const uint32_t AP_GRACE_MS = 10UL * 60 * 1000;  // AP stays up 10 min aft
 // RECOVERY-CHANGE (chunk1): CRASHES_FOR_* moved to lib/gqsafe/src/bootlogic.h
 // RECOVERY-CHANGE (chunk1): revision 2 = chunk 1 (design 8.10 rule 6); 3 = R2 (no game saving, automatic restarts on)
 // RECOVERY-CHANGE (R3-0F): revision 5 = R3 plumbing (web() accessor, webout.h, weather strike words, boot kind, spare sector probe)
-static const uint32_t GQ_RECOVERY_REV = 14;
+static const uint32_t GQ_RECOVERY_REV = 15;
 // RECOVERY-CHANGE (chunk1): timers of the restart gates
 static const uint32_t SLOW_STABLE_MS = 6UL * 3600 * 1000;   // `slow` counter cleared after 6 h of uptime
 static const uint32_t AUTO_MIN_UPTIME_MS = 30UL * 60 * 1000;
@@ -350,7 +350,7 @@ static const char PAGE_HEAD[] PROGMEM = R"HTML(<!doctype html><html><head><meta 
 a,button{color:#14171c;background:#e89a3c;border:0;border-radius:6px;padding:8px 14px;font:inherit;text-decoration:none;display:inline-block;cursor:pointer;margin:2px 0}
 .box{background:#1d2128;border:1px solid #2e333c;border-radius:8px;padding:14px;margin:12px 0}
 td{padding:2px 10px 2px 0}.warn{color:#ffb4a8}.ok{color:#7fdc9b}input{font:inherit;padding:6px;width:100%;box-sizing:border-box;margin:4px 0}
-input[type=checkbox],input[type=file]{width:auto}progress{width:100%;height:18px}small{color:#9aa1ad}form{display:inline}</style></head><body>)HTML";
+input[type=checkbox],input[type=file]{width:auto}progress{width:100%;height:18px}small{color:#9aa1ad}form{display:inline}button:disabled{opacity:.45;cursor:default}.busy a{opacity:.45;pointer-events:none}</style></head><body>)HTML";
 static const char PAGE_TAIL[] PROGMEM = "</body></html>";
 
 // The update page, in pieces so the optional "install anyway" box can be compiled in.
@@ -383,12 +383,13 @@ function pick(x){go.disabled=true;cr.textContent='';sel=x;if(!x)return;
   if(e.length){chk.className='warn';chk.textContent='Cannot install: '+e.join('; ')}
   else{chk.className=w.length?'warn':'ok';chk.textContent=(w.length?'Warning: '+w.join('; ')+'. ':'Looks good: ')+x.name+', '+x.size+' bytes.';go.disabled=false}};
  rd.readAsArrayBuffer(x)}
-go.onclick=()=>{const x=sel;if(!x)return;go.disabled=true;f.disabled=true;p.hidden=false;msg.textContent='Uploading... do not unplug the clock.';
+function lock(v){document.body.classList.toggle('busy',v);document.querySelectorAll('button').forEach(b=>b.disabled=v);f.disabled=v;if(!v)go.disabled=!sel}
+go.onclick=()=>{const x=sel;if(!x)return;lock(true);p.hidden=false;msg.textContent='Uploading... do not unplug the clock.';
  const fc=document.getElementById('force'),fd=new FormData();fd.append('firmware',x,x.name);const q=new XMLHttpRequest();q.open('POST','/update?crc='+crc+'&size='+n+'&force='+(fc&&fc.checked?1:0));
  q.upload.onprogress=e=>{if(e.lengthComputable)p.value=Math.round(e.loaded*100/e.total)};
  q.onload=()=>{if(q.status==200){msg.className='ok';msg.textContent=q.responseText+' The clock restarts in a few seconds; this page will reload.';setTimeout(()=>location.href='/',15000)}
-  else{msg.className='warn';msg.textContent='Update failed: '+q.responseText+'. The current firmware is still installed.';go.disabled=false;f.disabled=false}};
- q.onerror=()=>{msg.className='warn';msg.textContent='Connection lost. If the clock does not come back within a minute, power-cycle it; the previous firmware stays installed unless the upload completed.'};
+  else{msg.className='warn';msg.textContent='Update failed: '+q.responseText+'. The current firmware is still installed.';lock(false)}};
+ q.onerror=()=>{msg.className='warn';document.body.classList.remove('busy');msg.textContent='Connection lost. If the clock does not come back within a minute, power-cycle it; the previous firmware stays installed unless the upload completed.'};
  q.send(fd)};
 const R='https://raw.githubusercontent.com/techconcert/GeekQuest/builds/',up=document.getElementById('up'),ck=document.getElementById('ck');
 ck.onclick=async()=>{up.className='';up.textContent='Checking GitHub...';
@@ -402,18 +403,17 @@ ck.onclick=async()=>{up.className='';up.textContent='Checking GitHub...';
  }catch(e){up.className='warn';up.textContent='Could not reach GitHub from this browser. Choose the file by hand.'}};
 </script>
 <script>try{
-const G=[['GeekQuest','techconcert/GeekQuest'],['GeekQuestAI','techconcert/GeekQuestAI'],['MiniGodus','techconcert/MiniGodus']],gm=document.getElementById('gm'),gt=document.getElementById('gmm');
+const G=[['GeekQuestAI','techconcert/GeekQuestAI'],['MiniGodus','techconcert/MiniGodus']],gm=document.getElementById('gm'),gt=document.getElementById('gmm');
 G.forEach(g=>{const b=document.createElement('button');b.type='button';b.textContent=g[0];gm.append(b,' ');
  b.onclick=async()=>{gt.className='';gt.textContent='Checking '+g[0]+'...';
-  try{const u='https://raw.githubusercontent.com/'+g[1]+'/builds/',j=await(await fetch(u+'latest.json?'+Date.now(),{cache:'no-store'})).json(),cur=(await(await fetch('/info')).json()).version;
-   if(cur.indexOf(j.commit)>=0){gt.className='ok';gt.textContent=g[0]+' '+j.version+' is already running.';return}
+  try{const u='https://raw.githubusercontent.com/'+g[1]+'/builds/',j=await(await fetch(u+'latest.json?'+Date.now(),{cache:'no-store'})).json();
    gt.textContent=g[0]+' '+j.version+' ('+j.commit+'). Your saved game will not carry over. ';
    const c=document.createElement('button');c.type='button';c.textContent='Switch to '+g[0]+' '+j.version;gt.append(c);
-   c.onclick=async()=>{c.disabled=true;gt.textContent='Downloading '+g[0]+'...';
+   c.onclick=async()=>{lock(true);gt.textContent='Downloading '+g[0]+'...';
     try{const r=await fetch(u+j.bin);if(!r.ok)throw 0;const a=await r.arrayBuffer();pick(new File([a],j.bin.split('/').pop()));
      for(let i=0;i<80&&!cr.textContent;i++)await new Promise(r=>setTimeout(r,100));
-     if(go.disabled||chk.className!=='ok')throw 1;gt.textContent='Installing '+g[0]+'... do not unplug the clock.';go.click()}
-    catch(e){gt.className='warn';gt.textContent=e===1?'The file failed the checks above. Nothing was installed.':'Download failed. Nothing was installed.'}}
+     if(go.disabled||chk.className!=='ok')throw 1;gt.textContent='Installing '+g[0]+'... do not unplug the clock.';lock(false);go.click()}
+    catch(e){lock(false);gt.className='warn';gt.textContent=e===1?'The file failed the checks above. Nothing was installed.':'Download failed. Nothing was installed.'}}
   }catch(e){gt.className='warn';gt.textContent='Could not reach GitHub from this browser.'}}});
 }catch(e){}</script>)HTML";
 
