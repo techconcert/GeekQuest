@@ -55,7 +55,7 @@ static const uint32_t AP_GRACE_MS = 10UL * 60 * 1000;  // AP stays up 10 min aft
 // RECOVERY-CHANGE (chunk1): CRASHES_FOR_* moved to lib/gqsafe/src/bootlogic.h
 // RECOVERY-CHANGE (chunk1): revision 2 = chunk 1 (design 8.10 rule 6); 3 = R2 (no game saving, automatic restarts on)
 // RECOVERY-CHANGE (R3-0F): revision 5 = R3 plumbing (web() accessor, webout.h, weather strike words, boot kind, spare sector probe)
-static const uint32_t GQ_RECOVERY_REV = 12;
+static const uint32_t GQ_RECOVERY_REV = 13;
 // RECOVERY-CHANGE (chunk1): timers of the restart gates
 static const uint32_t SLOW_STABLE_MS = 6UL * 3600 * 1000;   // `slow` counter cleared after 6 h of uptime
 static const uint32_t AUTO_MIN_UPTIME_MS = 30UL * 60 * 1000;
@@ -580,6 +580,7 @@ static void handleRoot() {
       (unsigned)(GC_NIGHT_END_MIN / 60), (unsigned)(GC_NIGHT_END_MIN % 60));
   o.p(PSTR("<br><button>Apply</button> <small>Saved permanently: survives power cuts and updates.</small></form>"
            "<form method='post' action='/reset_settings' onsubmit=\"return confirm('Put the game settings (info card interval, quiet at night) back to defaults?')\"><button>Reset game settings</button></form></div>"
+           "<div class='box'><form method='post' action='/reset_progress' onsubmit=\"return confirm('Start a new game from day 1? Everything the hero has built and earned is erased and cannot be brought back. The clock settings (WiFi, weather, sleep, screen) stay.')\"><b>Game progress</b><br><button>Reset game progress</button> <small>Starts over at day 1; clock settings stay.</small></form></div>"
            "<form method='post' action='/reboot'><button>Restart</button></form> "
            "<form method='post' action='/safemode'><button>Restart in safe mode</button></form>"));
   o.f(PSTR("<p><small>GQ-RECOVERY-REV %u</small></p>"), (unsigned)GQ_RECOVERY_REV);
@@ -783,6 +784,8 @@ static void handleDisplay() {
 }
 
 static void handleResetSettings() { touch(); prefs::resetGame(); redirectHome(); }
+// R13: new game from day 1 (the settings stay). Only a flag: store::loop() resets the game and saves it.
+static void handleResetProgress() { touch(); store::requestNewGame(); redirectHome(); }
 
 static void handleNotFound() {
   netwatch::noteHttp();   // RECOVERY-CHANGE (0B)
@@ -832,6 +835,7 @@ void begin() {
   server.on("/reboot", HTTP_POST, []() { server.send(200, F("text/plain"), F("Restarting")); requestRestart(RR_USER); });
   server.on("/safemode", HTTP_POST, []() { server.send(200, F("text/plain"), F("Restarting into safe mode")); requestRestart(RR_SAFEMODE); });
   server.on("/reset_settings", HTTP_POST, handleResetSettings);
+  server.on("/reset_progress", HTTP_POST, handleResetProgress);
   server.onNotFound(handleNotFound);
   server.begin();
 

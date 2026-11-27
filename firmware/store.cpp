@@ -29,7 +29,7 @@ static GqSettings s_lastSet;
 static GqConf s_lastConf;
 static uint8_t s_burst = 0;
 static uint32_t s_burstT = 0;
-static bool s_wrote = false;
+static bool s_wrote = false, s_newGame = false;
 
 static uint32_t slotAddr(uint32_t i) { return BASE + (i / SL_SLOTS_PER_SECTOR) * SL_SECTOR_BYTES + (i % SL_SLOTS_PER_SECTOR) * SL_SLOT_BYTES; }
 
@@ -108,6 +108,15 @@ void loop() {
   if (now - s_t < 1000) return;
   s_t = now;
   if (safety::updating()) return;
+  if (s_newGame) {                             // R13: owner pressed "Reset game progress" on the status page
+    s_newGame = false;
+    gc_reset_game();                           // village only; safe mode runs another scene and never gets here
+    s_gameQ = false;                           // the fresh game replaces a game that was kept aside after crashes
+    s_burst = 0;
+    s_burst++;
+    save(true);
+    return;
+  }
   static bool init = false;
   if (!init) {                                 // baseline: what is in RTC now equals what the record holds (or defaults)
     init = true;
@@ -130,6 +139,8 @@ void loop() {
 }
 
 bool active() { return s_on; }
+
+void requestNewGame() { s_newGame = true; }
 
 void statusLine(char* buf, size_t n) {
   if (!n) return;

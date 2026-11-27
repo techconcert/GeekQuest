@@ -118,6 +118,10 @@ If you switch to a game whose firmware has no switcher yet, come back by uploadi
 The status page has a **Game settings** section (info card interval, quiet at night) with its own
 Apply and **Reset game settings** buttons, which touch only those two settings.
 
+Below it, **Reset game progress** (R13) starts a new game from day 1 after a confirmation: what the hero has
+built and earned is erased, and the new game is saved to flash at once. The clock settings (WiFi, weather
+location, sleep times, screen) and the game settings stay as they are.
+
 **Settings and the game survive a power cut** (R5): see "Saving to flash" below.
 
 ## Recovery and the rescue hotspot

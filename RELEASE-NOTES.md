@@ -1,6 +1,6 @@
-What is new in GeekQuest r12:
+What is new in GeekQuest r13:
 
-- New "Switch game mode" area under Firmware update: pick GeekQuest or GeekQuestAI, see the version, confirm, and the clock installs that game's latest build through the normal update upload.
-- A game's saved progress does not carry over to another game; the other game starts fresh.
-- The update page keeps working as before (choose a file by hand, "Check for a new version", the checks before installing, the rescue hotspot). The new part is a separate script, so if it ever fails the upload still works.
-- Flash this one by hand once: older builds do not have the switcher.
+- New "Reset game progress" button on the clock's status page (backend URL): after a confirmation it starts a new game from day 1 and saves it to flash at once.
+- Your clock settings (WiFi, weather location, sleep times, screen) and the game settings stay as they are.
+- Works at any moment, including during a boss fight or a deep mission.
+- Includes everything from r12: Switch game mode under Firmware update.

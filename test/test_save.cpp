@@ -205,11 +205,35 @@ static void test_reset() {
   std::printf("reset ok\n");
 }
 
+// R13: "Reset game progress" starts over from day 1, also in the middle of a boss fight or a deep mission.
+static void test_reset_progress() {
+  for (int mode = 0; mode < 3; mode++) {
+    sim_start(11 + mode);
+    sim_minutes(mode == 0 ? 900 : 60);
+    gc_debug(GQ_DBG_ADD_COINS, 40);
+    if (mode == 1) { gc_debug(GQ_DBG_BOSS, 4); sim_minutes(1); }
+    if (mode == 2) { gc_debug(GQ_DBG_DELVE, 1); sim_minutes(3); }
+    gc_reset_game();
+    CHECK(gc_query(GQ_Q_COINS) == 3);
+    CHECK(gc_query(GQ_Q_DAY) == 0);
+    CHECK(gc_query(GQ_Q_EARNED_TOTAL) == 0);
+    CHECK(gc_query(GQ_Q_SPENT_TOTAL) == 0);
+    uint8_t out[GC_SAVE_BYTES];
+    CHECK(gc_save_export(out, GC_SAVE_BYTES) == GC_SAVE_BYTES);
+    CHECK(gc_save_check(out, GC_SAVE_BYTES) == GC_SAVE_OK);
+    sim_minutes(24 * 60);                      // a whole day afterwards: nothing stuck, nothing invalid
+    CHECK(gc_save_export(out, GC_SAVE_BYTES) == GC_SAVE_BYTES);
+    CHECK(gc_save_check(out, GC_SAVE_BYTES) == GC_SAVE_OK);
+  }
+  std::printf("reset progress ok\n");
+}
+
 int main() {
   test_round_trip();
   test_rejection();
   test_random_valid();
   test_reset();
+  test_reset_progress();
   std::printf("PASS\n");
   return 0;
 }

@@ -24,6 +24,10 @@ const uint8_t* savedGame();                    // GC_SAVE_BYTES bytes
 
 bool active();                                 // saving is on (not safe mode, flash verified)
 
+// R13: start a new game (day 1, nothing built or earned) and save it at once, replacing the saved game. The settings are kept.
+// Only sets a flag; loop() does the work, so the web page code never touches the game or flash.
+void requestNewGame();
+
 // Status text for the status page ("Saved to flash 12 min ago (record 40)."), empty when there is nothing to say.
 void statusLine(char* buf, size_t n);
 
