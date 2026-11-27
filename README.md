@@ -94,7 +94,7 @@ build exists, and **Download it** loads the file into the page for you; you then
 install**. The clock itself never talks to GitHub. The same checks run on the file as for a manual upload.
 
 **Switch game mode** (`/update`, under Firmware update, R12): the same clock can run other games built on
-this firmware, so the page offers **GeekQuest** and **GeekQuestAI**. Pressing one makes your browser read that
+this firmware, so the page offers **GeekQuest**, **GeekQuestAI** and **MiniGodus**. Pressing one makes your browser read that
 game's `latest.json` on its own `builds` branch and shows the version; you then confirm with **Switch to ...**,
 and the file is downloaded and installed through the normal upload, with the same checks. A game's saved
 progress does not carry over to another game (each game only reads its own save), so the other game starts fresh.

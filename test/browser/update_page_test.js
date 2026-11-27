@@ -16,8 +16,9 @@ async function open(o) {
     if (q.url().endsWith('/info')) return r.fulfill({ json: { version: 'r12-aaaaaaa', free_ota_bytes: 593920 } });
     return r.fulfill({ contentType: 'text/html', body: page }); });
   await p.route('https://raw.githubusercontent.com/**', r => { const u = r.request().url();
-    if (u.includes('/builds/latest.json')) { const ai = u.includes('GeekQuestAI'); return r.fulfill({ headers: CORS, json: ai ? { version: 'r5', commit: 'bbbbbbb', bin: 'firmware/ai.bin' } : { version: 'r12', commit: 'aaaaaaa', bin: 'firmware/gq.bin' } }); }
+    if (u.includes('/builds/latest.json')) { const ai = u.includes('GeekQuestAI'), mg = u.includes('MiniGodus'); if (mg) return r.fulfill({ headers: CORS, json: { version: '4', commit: 'ccccccc', bin: 'firmware/mg.bin' } }); return r.fulfill({ headers: CORS, json: ai ? { version: 'r5', commit: 'bbbbbbb', bin: 'firmware/ai.bin' } : { version: 'r12', commit: 'aaaaaaa', bin: 'firmware/gq.bin' } }); }
     if (u.endsWith('ai.bin')) return r.fulfill({ headers: CORS, body: image(385024, !o.bad) });
+    if (u.endsWith('mg.bin')) return r.fulfill({ headers: CORS, body: image(415136, true) });
     return r.fulfill({ status: 404, body: '' }); });
   await p.goto('http://clock/update'); return { b, p, posts, errs };
 }
@@ -30,6 +31,10 @@ async function open(o) {
   ok(t.errs.length === 0, 'no page errors'); await t.b.close();
   t = await open({}); await t.p.click('#gm button:nth-of-type(1)'); await t.p.waitForTimeout(500);
   ok(/already running/.test(await t.p.textContent('#gmm')) && t.posts.length === 0, 'the game that is already running is not reinstalled'); await t.b.close();
+  t = await open({}); await t.p.click('#gm button:nth-of-type(3)'); await t.p.waitForTimeout(500);
+  ok(/MiniGodus 4/.test(await t.p.textContent('#gmm')), 'MiniGodus is offered and shows its version');
+  await t.p.click('#gmm button'); await t.p.waitForTimeout(2500);
+  ok(t.posts.length === 1 && /size=415136/.test(t.posts[0]), 'confirming MiniGodus uploads through /update'); await t.b.close();
   t = await open({ bad: true }); await t.p.click('#gm button:nth-of-type(2)'); await t.p.waitForTimeout(500); await t.p.click('#gmm button'); await t.p.waitForTimeout(2500);
   ok(/failed the checks/.test(await t.p.textContent('#gmm')) && t.posts.length === 0, 'a file that fails the page checks is never uploaded'); await t.b.close();
   t = await open({}); await t.p.click('#ck'); await t.p.waitForTimeout(500);

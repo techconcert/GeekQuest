@@ -55,7 +55,7 @@ static const uint32_t AP_GRACE_MS = 10UL * 60 * 1000;  // AP stays up 10 min aft
 // RECOVERY-CHANGE (chunk1): CRASHES_FOR_* moved to lib/gqsafe/src/bootlogic.h
 // RECOVERY-CHANGE (chunk1): revision 2 = chunk 1 (design 8.10 rule 6); 3 = R2 (no game saving, automatic restarts on)
 // RECOVERY-CHANGE (R3-0F): revision 5 = R3 plumbing (web() accessor, webout.h, weather strike words, boot kind, spare sector probe)
-static const uint32_t GQ_RECOVERY_REV = 13;
+static const uint32_t GQ_RECOVERY_REV = 14;
 // RECOVERY-CHANGE (chunk1): timers of the restart gates
 static const uint32_t SLOW_STABLE_MS = 6UL * 3600 * 1000;   // `slow` counter cleared after 6 h of uptime
 static const uint32_t AUTO_MIN_UPTIME_MS = 30UL * 60 * 1000;
@@ -402,7 +402,7 @@ ck.onclick=async()=>{up.className='';up.textContent='Checking GitHub...';
  }catch(e){up.className='warn';up.textContent='Could not reach GitHub from this browser. Choose the file by hand.'}};
 </script>
 <script>try{
-const G=[['GeekQuest','techconcert/GeekQuest'],['GeekQuestAI','techconcert/GeekQuestAI']],gm=document.getElementById('gm'),gt=document.getElementById('gmm');
+const G=[['GeekQuest','techconcert/GeekQuest'],['GeekQuestAI','techconcert/GeekQuestAI'],['MiniGodus','techconcert/MiniGodus']],gm=document.getElementById('gm'),gt=document.getElementById('gmm');
 G.forEach(g=>{const b=document.createElement('button');b.type='button';b.textContent=g[0];gm.append(b,' ');
  b.onclick=async()=>{gt.className='';gt.textContent='Checking '+g[0]+'...';
   try{const u='https://raw.githubusercontent.com/'+g[1]+'/builds/',j=await(await fetch(u+'latest.json?'+Date.now(),{cache:'no-store'})).json(),cur=(await(await fetch('/info')).json()).version;
